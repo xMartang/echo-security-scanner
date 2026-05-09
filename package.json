@@ -14,7 +14,8 @@
     "lint": "eslint src tests --no-error-on-unmatched-pattern",
     "typecheck": "tsc --noEmit",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "prepare": "husky"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
@@ -47,12 +48,6 @@
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.0.0"
-  },
-  "lint-staged": {
-    "*.ts": [
-      "eslint --fix",
-      "tsc --noEmit --skipLibCheck"
-    ]
   },
   "engines": {
     "node": ">=24.0.0"
