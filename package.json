@@ -10,7 +10,7 @@
     "dev:worker": "tsx watch src/bullmq.ts",
     "start": "node dist/api.js",
     "start:worker": "node dist/bullmq.js",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --forceExit --maxWorkers=2",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --forceExit --runInBand",
     "lint": "eslint src tests --no-error-on-unmatched-pattern",
     "typecheck": "tsc --noEmit",
     "prisma:migrate": "prisma migrate dev",
