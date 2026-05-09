@@ -45,9 +45,9 @@ async function main() {
   }, 25_000).unref();
 
   // Recover images left in SCANNING state by a previous crashed worker.
-  const recoveredCount = await imageRepository.resetStuckScanning();
+  const recoveredCount = await imageRepository.markStuckScanningAsFailed();
   if (recoveredCount > 0) {
-    logger.warn({ recoveredCount }, 'reset stuck SCANNING images to PENDING');
+    logger.warn({ recoveredCount }, 'marked stuck SCANNING images as FAILED');
   }
 
   // Create the sandboxed scan worker (forked child processes, one per job).

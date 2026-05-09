@@ -137,7 +137,7 @@ describe('imageRepository', () => {
     expect(updated.lastError).toBe('trivy timeout');
   });
 
-  it('resetStuckScanning resets SCANNING → PENDING', async () => {
+  it('markStuckScanningAsFailed marks SCANNING → FAILED', async () => {
     const a = await repo.upsertImage('nginx', '1.19');
     const b = await repo.upsertImage('redis', '6.0');
     await testDb.image.updateMany({
@@ -146,20 +146,20 @@ describe('imageRepository', () => {
     });
     await repo.upsertImage('alpine', '3.12'); // PENDING — should be untouched
 
-    const count = await repo.resetStuckScanning();
+    const count = await repo.markStuckScanningAsFailed();
     expect(count).toBe(2);
 
     const rows = await testDb.image.findMany({ orderBy: { name: 'asc' } });
     const [alpine, nginx, redis] = rows;
     expect(alpine?.status).toBe(ScanStatus.PENDING); // alpine — always PENDING
-    expect(nginx?.status).toBe(ScanStatus.PENDING);  // nginx — was SCANNING
-    expect(nginx?.lastError).toBe('recovered from stuck scanning state');
-    expect(redis?.status).toBe(ScanStatus.PENDING);  // redis — was SCANNING
+    expect(nginx?.status).toBe(ScanStatus.FAILED);   // nginx — was SCANNING
+    expect(nginx?.lastError).toBe('Container exited abruptly while scanning; marked as FAILED.');
+    expect(redis?.status).toBe(ScanStatus.FAILED);   // redis — was SCANNING
   });
 
-  it('resetStuckScanning returns 0 when nothing is stuck', async () => {
+  it('markStuckScanningAsFailed returns 0 when nothing is stuck', async () => {
     await repo.upsertImage('nginx', '1.19');
-    const count = await repo.resetStuckScanning();
+    const count = await repo.markStuckScanningAsFailed();
     expect(count).toBe(0);
   });
 });

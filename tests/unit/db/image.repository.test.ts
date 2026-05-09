@@ -3,22 +3,22 @@ import type { PrismaClient } from '@prisma/client';
 import { ScanStatus } from '@prisma/client';
 import { createImageRepository } from '@/db/repositories/image.repository.js';
 
-describe('imageRepository.resetStuckScanning', () => {
-  it('resets SCANNING rows to PENDING and returns count', async () => {
+describe('imageRepository.markStuckScanningAsFailed', () => {
+  it('marks SCANNING rows as FAILED and returns count', async () => {
     const mockUpdateMany = jest
       .fn<() => Promise<{ count: number }>>()
       .mockResolvedValue({ count: 3 });
     const mockDb = { image: { updateMany: mockUpdateMany } } as unknown as PrismaClient;
 
     const repo = createImageRepository(mockDb);
-    const count = await repo.resetStuckScanning();
+    const count = await repo.markStuckScanningAsFailed();
 
     expect(count).toBe(3);
     expect(mockUpdateMany).toHaveBeenCalledWith({
       where: { status: ScanStatus.SCANNING },
       data: {
-        status: ScanStatus.PENDING,
-        lastError: 'recovered from stuck scanning state',
+        status: ScanStatus.FAILED,
+        lastError: 'Container exited abruptly while scanning; marked as FAILED.',
       },
     });
   });
@@ -32,7 +32,7 @@ describe('imageRepository.resetStuckScanning', () => {
       },
     } as unknown as PrismaClient;
 
-    const count = await createImageRepository(mockDb).resetStuckScanning();
+    const count = await createImageRepository(mockDb).markStuckScanningAsFailed();
     expect(count).toBe(0);
   });
 });

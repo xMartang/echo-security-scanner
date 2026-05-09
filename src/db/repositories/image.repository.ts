@@ -29,15 +29,16 @@ export function createImageRepository(db: PrismaClient) {
 
     /**
      * On worker startup: any row stuck in SCANNING means the previous process
-     * crashed mid-scan. Reset to PENDING so the next scheduler tick re-queues it.
+     * crashed mid-scan. Marks as FAILED with a descriptive message. The startup
+     * fan-out already re-queues all images, so PENDING would be redundant.
      * Returns the count of rows reset.
      */
-    async resetStuckScanning(): Promise<number> {
+    async markStuckScanningAsFailed(): Promise<number> {
       const result = await db.image.updateMany({
         where: { status: ScanStatus.SCANNING },
         data: {
-          status: ScanStatus.PENDING,
-          lastError: 'recovered from stuck scanning state',
+          status: ScanStatus.FAILED,
+          lastError: 'Container exited abruptly while scanning; marked as FAILED.',
         },
       });
       return result.count;
