@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 
-export type DeadlockRetryOptions = {
+export type PrismaRetryOptions = {
   /** Maximum number of retry attempts (default: 3). */
   maxRetries?: number;
   /** Base delay in milliseconds before the first retry (default: 100). */
@@ -35,9 +35,9 @@ function isRetriable(err: unknown): err is Prisma.PrismaClientKnownRequestError 
  *
  * All other errors propagate immediately without retry.
  */
-export async function withDeadlockRetry<T>(
+export async function retryOnPrismaError<T>(
   fn: () => Promise<T>,
-  opts: DeadlockRetryOptions = {},
+  opts: PrismaRetryOptions = {},
 ): Promise<T> {
   const { maxRetries = 3, baseDelayMs = 100 } = opts;
 
