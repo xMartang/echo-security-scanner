@@ -1,0 +1,89 @@
+/**
+ * Sandboxed BullMQ processor for `scan-image` jobs.
+ *
+ * BullMQ forks a child process per job and `import()`s this file. The child
+ * inherits `process.env` from the parent bullmq.ts process (including
+ * SERVICE_NAME=bullmq, DATABASE_URL, etc.).
+ *
+ * Lazy singletons prevent double-init when BullMQ reuses the forked process
+ * across multiple jobs in the same child.
+ */
+
+import 'dotenv/config';
+import type { SandboxedJob } from 'bullmq';
+import { PrismaClient } from '@prisma/client';
+import type { ScanImageJobData, ScanImageJobResult } from '@/types/job-payload.js';
+import { env } from '@/config/env.js';
+import { createLogger } from '@/utils/log/logger.js';
+import { createImageRepository } from '@/db/repositories/image.repository.js';
+import { persistScanResults } from '@/services/persistence.service.js';
+import { scan } from '@/services/scanner.service.js';
+import { retryOnDBError } from '@/utils/db/retry.js';
+
+// ── Lazy singletons ──────────────────────────────────────────────────────────
+
+let sharedPrisma: PrismaClient | undefined;
+function getSharedPrisma(): PrismaClient {
+  if (!sharedPrisma) {
+    sharedPrisma = new PrismaClient();
+    process.on('exit', () => { void sharedPrisma?.$disconnect(); });
+  }
+  return sharedPrisma;
+}
+
+const logger = createLogger({
+  serviceName: env.SERVICE_NAME,
+  dir: env.LOG_DIR,
+  level: env.LOG_LEVEL,
+});
+
+// ── Processor ────────────────────────────────────────────────────────────────
+
+/**
+ * Core scan logic — exported so integration tests can call it directly without
+ * going through the BullMQ sandbox (which requires compiled JS on disk).
+ */
+export async function processScanJob(
+  imageName: string,
+  imageTag: string,
+  prismaClient?: PrismaClient,
+): Promise<ScanImageJobResult> {
+  const db = prismaClient ?? getSharedPrisma();
+  const repo = createImageRepository(db);
+
+  // 1. Mark image SCANNING so operators see it in progress.
+  const image = await repo.upsertImage(imageName, imageTag);
+  await repo.markScanning(image.id);
+  logger.info({ image: `${imageName}:${imageTag}` }, 'scan started');
+
+  try {
+    // 2. Invoke Trivy via execa; stream output through json-stream pipeline.
+    const { result, stderr } = await scan(imageName, imageTag);
+    if (stderr) logger.debug({ stderr }, 'trivy stderr');
+
+    // 3. Persist results — wrap with retryOnDBError for transient Postgres errors.
+    await retryOnDBError(
+      () => persistScanResults(imageName, imageTag, result, db),
+    );
+
+    logger.info(
+      { image: `${imageName}:${imageTag}`, cveCount: result.vulnerabilities.length },
+      'scan completed',
+    );
+    return { cveCount: result.vulnerabilities.length };
+  } catch (err) {
+    // 4. Never throw out of the processor — update DB and swallow.
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    logger.error({ err, image: `${imageName}:${imageTag}` }, 'scan failed');
+    await repo.markFailed(image.id, errorMessage);
+    return { cveCount: 0 };
+  }
+}
+
+/**
+ * Default export consumed by BullMQ's sandboxed Worker.
+ * Must be the default export of this file.
+ */
+export default async function (job: SandboxedJob<ScanImageJobData>): Promise<ScanImageJobResult> {
+  return processScanJob(job.data.imageName, job.data.imageTag);
+}
