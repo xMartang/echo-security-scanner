@@ -1,20 +1,19 @@
+import { createDefaultEsmPreset } from 'ts-jest';
+
+const preset = createDefaultEsmPreset({
+  tsconfig: 'tsconfig.json',
+});
+
 /** @type {import('jest').Config} */
 export default {
-  preset: 'ts-jest/presets/default-esm',
+  ...preset,
   testEnvironment: 'node',
-  extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
+    // Strip .js suffix from @/ alias imports so Jest can find the TS source
+    '^@/(.*)\\.js$': '<rootDir>/src/$1',
     '^@/(.*)$': '<rootDir>/src/$1',
+    // Strip .js from relative imports
     '^(\\.{1,2}/.*)\\.js$': '$1',
-  },
-  transform: {
-    '^.+\\.tsx?$': [
-      'ts-jest',
-      {
-        useESM: true,
-        tsconfig: '<rootDir>/tsconfig.json',
-      },
-    ],
   },
   testMatch: ['<rootDir>/tests/**/*.test.ts'],
   collectCoverageFrom: ['src/**/*.ts'],
