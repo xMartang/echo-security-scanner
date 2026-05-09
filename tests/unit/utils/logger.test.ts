@@ -4,17 +4,25 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const LOG_DIR = join('./logs', 'local');
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
 /**
  * pino-roll appends a sequence number to the filename base:
  * e.g. api.debug.1.log, api.info.1.log, api.error.1.log
  */
-async function readLevelFile(dir: string, serviceName: string, level: string, timeoutMs = 2000): Promise<string> {
+async function readLevelFile(
+  dir: string,
+  serviceName: string,
+  level: string,
+  timeoutMs = 2000,
+): Promise<string> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
       const files = await readdir(dir);
-      const match = files.find((f) => f.startsWith(`${serviceName}.${level}.`) && f.endsWith('.log'));
+      const match = files.find(
+        (f) => f.startsWith(`${serviceName}.${level}.`) && f.endsWith('.log'),
+      );
       if (match) return readFile(join(dir, match), 'utf-8');
     } catch {
       // dir may not exist yet
@@ -35,45 +43,80 @@ describe('createLogger', () => {
     })();
   });
 
-  it('routes debug records to <service>.debug.*.log', async () => {
+  // ── timestamp format ────────────────────────────────────────────────────────
+
+  it('emits time as ISO-8601 string, not epoch ms', async () => {
+    const logger = createLogger({ serviceName: 'ts-test', dir, level: 'debug' });
+    logger.info('timestamp check');
+    const content = await readLevelFile(dir, 'ts-test', 'info');
+    const parsed = JSON.parse(content.trim()) as Record<string, unknown>;
+    expect(typeof parsed.time).toBe('string');
+    expect(String(parsed.time)).toMatch(ISO_RE);
+  });
+
+  // ── cumulative routing ──────────────────────────────────────────────────────
+
+  it('debug records go to debug.log ONLY (below info threshold)', async () => {
     const logger = createLogger({ serviceName: 'test', dir, level: 'debug' });
     logger.debug({ x: 1 }, 'hello debug');
     const content = await readLevelFile(dir, 'test', 'debug');
     expect(content).toContain('hello debug');
     expect(JSON.parse(content.trim())).toMatchObject({ level: 20, msg: 'hello debug' });
+    // debug is below info threshold — must NOT appear in info.log or error.log
+    // Wait briefly for any stray writes then re-read
+    await new Promise((r) => setTimeout(r, 300));
+    const filesAfter = await readdir(dir);
+    expect(filesAfter.some((f) => f.startsWith('test.info.'))).toBe(false);
+    expect(filesAfter.some((f) => f.startsWith('test.error.'))).toBe(false);
   });
 
-  it('routes info records to <service>.info.*.log', async () => {
+  it('info records go to debug.log AND info.log', async () => {
     const logger = createLogger({ serviceName: 'test', dir, level: 'debug' });
     logger.info({ x: 2 }, 'hello info');
-    const content = await readLevelFile(dir, 'test', 'info');
-    expect(content).toContain('hello info');
-    expect(JSON.parse(content.trim())).toMatchObject({ level: 30, msg: 'hello info' });
+    const [infoContent, debugContent] = await Promise.all([
+      readLevelFile(dir, 'test', 'info'),
+      readLevelFile(dir, 'test', 'debug'),
+    ]);
+    expect(infoContent).toContain('hello info');
+    expect(debugContent).toContain('hello info');
+    expect(JSON.parse(infoContent.trim())).toMatchObject({ level: 30, msg: 'hello info' });
   });
 
-  it('routes warn records to <service>.info.*.log (folded)', async () => {
+  it('warn records go to debug.log AND info.log', async () => {
     const logger = createLogger({ serviceName: 'test', dir, level: 'debug' });
     logger.warn({ x: 3 }, 'hello warn');
-    const content = await readLevelFile(dir, 'test', 'info');
-    expect(content).toContain('hello warn');
-    expect(JSON.parse(content.trim())).toMatchObject({ level: 40, msg: 'hello warn' });
+    const [infoContent, debugContent] = await Promise.all([
+      readLevelFile(dir, 'test', 'info'),
+      readLevelFile(dir, 'test', 'debug'),
+    ]);
+    expect(infoContent).toContain('hello warn');
+    expect(debugContent).toContain('hello warn');
+    expect(JSON.parse(infoContent.trim())).toMatchObject({ level: 40, msg: 'hello warn' });
   });
 
-  it('routes error records to <service>.error.*.log', async () => {
+  it('error records go to ALL THREE files (debug, info, error)', async () => {
     const logger = createLogger({ serviceName: 'test', dir, level: 'debug' });
     logger.error({ err: new Error('boom') }, 'hello error');
-    const content = await readLevelFile(dir, 'test', 'error');
-    expect(content).toContain('hello error');
-    expect(JSON.parse(content.trim())).toMatchObject({ level: 50, msg: 'hello error' });
+    const [errorContent, infoContent, debugContent] = await Promise.all([
+      readLevelFile(dir, 'test', 'error'),
+      readLevelFile(dir, 'test', 'info'),
+      readLevelFile(dir, 'test', 'debug'),
+    ]);
+    expect(errorContent).toContain('hello error');
+    expect(infoContent).toContain('hello error');
+    expect(debugContent).toContain('hello error');
+    expect(JSON.parse(errorContent.trim())).toMatchObject({ level: 50, msg: 'hello error' });
   });
 
-  it('does not write debug records when level is info', async () => {
+  it('pino filters out debug-level records when logger level is info', async () => {
     const logger = createLogger({ serviceName: 'nodebug', dir, level: 'info' });
-    logger.debug('should not appear');
-    logger.info('trigger info write');
-    await readLevelFile(dir, 'nodebug', 'info');
-    const files = await readdir(dir);
-    expect(files.some((f) => f.startsWith('nodebug.debug.'))).toBe(false);
+    logger.debug('should not appear — below info threshold');
+    logger.info('trigger write to both debug.log and info.log');
+    // debug.log exists (cumulative routing: info records land there too),
+    // but must NOT contain the debug-level message pino suppressed.
+    const debugContent = await readLevelFile(dir, 'nodebug', 'debug');
+    expect(debugContent).not.toContain('should not appear');
+    expect(debugContent).toContain('trigger write');
   });
 
   // Verifies that logs land in ./logs/local/ — the plan's done-condition

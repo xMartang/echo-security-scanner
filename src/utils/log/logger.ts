@@ -20,6 +20,9 @@ export type LoggerOptions = {
 export function createLogger(opts: LoggerOptions): pino.Logger {
   return pino({
     level: opts.level ?? 'info',
+    // Emit time as ISO-8601 string ("2026-05-10T12:00:00.000Z") instead of
+    // epoch milliseconds so log files are human-readable without a converter.
+    timestamp: pino.stdTimeFunctions.isoTime,
     base: { service: opts.serviceName },
     redact: ['req.headers.authorization', 'DATABASE_URL', 'REDIS_URL'],
     transport: {

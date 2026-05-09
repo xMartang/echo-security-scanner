@@ -1,9 +1,13 @@
 /**
  * Pino worker-thread transport.
- * Demuxes NDJSON lines by numeric pino level into three rotating log files:
- *   - ${serviceName}.debug.{n}.log  (level 20)
- *   - ${serviceName}.info.{n}.log   (level 30 + 40 warn, folded)
- *   - ${serviceName}.error.{n}.log  (level >= 50)
+ *
+ * Each log file receives its named level AND everything above it:
+ *   - ${serviceName}.debug.{n}.log  (level >= 20 — all records)
+ *   - ${serviceName}.info.{n}.log   (level >= 30 — info, warn, error, fatal)
+ *   - ${serviceName}.error.{n}.log  (level >= 50 — error, fatal)
+ *
+ * This mirrors the "lower files are supersets" convention so operators can
+ * grep debug.log for the full picture or error.log for just failures.
  *
  * Streams are lazily created on first write for each level so no empty
  * files are left behind for levels that receive no records.
@@ -34,38 +38,55 @@ export default async function transport(opts) {
     mkdir: true,
   };
 
-  // Lazy stream cache: created only when a record of that level first arrives.
+  // Lazy stream cache — created on first write so no empty files are produced.
   const streams = { debug: null, info: null, error: null };
-  // Pending writes accumulated while the stream is being initialised.
+  // Writes that arrive while a stream is still being initialised.
   const pending = { debug: [], info: [], error: [] };
-  // Initialisation promises — prevent duplicate creation on concurrent writes.
+  // In-flight init promises — one per level key, prevents duplicate roll() calls.
   const init = { debug: null, info: null, error: null };
 
-  async function getStream(level) {
-    if (streams[level]) return streams[level];
-    if (!init[level]) {
-      init[level] = roll({ file: join(dir, `${serviceName}.${level}`), ...rollOpts }).then((s) => {
-        streams[level] = s;
-        // Drain buffered writes that arrived during initialisation
-        for (const chunk of pending[level]) s.write(chunk);
-        pending[level] = [];
-        return s;
-      });
+  async function getStream(levelKey) {
+    if (streams[levelKey]) return streams[levelKey];
+    if (!init[levelKey]) {
+      init[levelKey] = roll({ file: join(dir, `${serviceName}.${levelKey}`), ...rollOpts })
+        .then((s) => {
+          streams[levelKey] = s;
+          // Drain writes that accumulated while the file was being opened.
+          for (const chunk of pending[levelKey]) s.write(chunk);
+          pending[levelKey] = [];
+          return s;
+        });
     }
-    return init[level];
+    return init[levelKey];
   }
 
-  function route(level, output) {
-    if (level === LOG_LEVELS.debug) {
-      if (streams.debug) streams.debug.write(output);
-      else { pending.debug.push(output); getStream('debug').catch(() => undefined); }
-    } else if (level === LOG_LEVELS.info || level === LOG_LEVELS.warn) {
-      if (streams.info) streams.info.write(output);
-      else { pending.info.push(output); getStream('info').catch(() => undefined); }
-    } else if (level >= LOG_LEVELS.error) {
-      if (streams.error) streams.error.write(output);
-      else { pending.error.push(output); getStream('error').catch(() => undefined); }
+  /**
+   * Write `output` to the named stream level.
+   * Guard: only starts a new getStream() call when no init is already in flight.
+   * If init is in progress the pending array is sufficient — the then() will drain it.
+   */
+  function writeTo(levelKey, output) {
+    if (streams[levelKey]) {
+      streams[levelKey].write(output);
+    } else {
+      pending[levelKey].push(output);
+      if (!init[levelKey]) {
+        getStream(levelKey).catch(() => undefined);
+      }
     }
+  }
+
+  /**
+   * Cumulative routing — each file receives its level AND all levels above it.
+   *
+   *  debug.log  ← everything  (level >= debug)
+   *  info.log   ← info+       (level >= info,  includes warn / error / fatal)
+   *  error.log  ← error+      (level >= error, includes fatal)
+   */
+  function route(level, output) {
+    if (level >= LOG_LEVELS.debug) writeTo('debug', output);
+    if (level >= LOG_LEVELS.info)  writeTo('info',  output);
+    if (level >= LOG_LEVELS.error) writeTo('error', output);
   }
 
   return new Writable({
@@ -88,8 +109,8 @@ export default async function transport(opts) {
     final(callback) {
       const active = Object.values(streams).filter(Boolean);
       if (active.length === 0) { callback(); return; }
-      let pending2 = active.length;
-      function done() { if (--pending2 === 0) callback(); }
+      let remaining = active.length;
+      function done() { if (--remaining === 0) callback(); }
       active.forEach((s) => s.end(done));
     },
   });
