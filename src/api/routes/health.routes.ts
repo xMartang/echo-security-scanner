@@ -7,6 +7,7 @@ export function createHealthRouter(healthService: HealthService): Router {
   const router = Router();
   const ctrl = createHealthController(healthService);
 
+  // GET /api/health
   router.get('/', asyncHandler(ctrl.getHealth.bind(ctrl)));
 
   return router;
