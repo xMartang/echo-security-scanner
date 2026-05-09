@@ -24,7 +24,10 @@ src/
   db/           # Prisma client singleton and repository layer
   config/       # Env var validation (zod schemas)
   types/        # Shared TypeScript types and interfaces
-  utils/        # Shared helpers (logger, error classes)
+  utils/
+    db/         # DB-related helpers (e.g. retryOnDBError)
+    log/        # Logging helpers (logger.ts, log-transport.mjs)
+    errors.ts   # Domain error classes
 prisma/
   schema.prisma
 docs/
@@ -76,6 +79,13 @@ PORT                  # default 3000
 - `pnpm lint` — run ESLint
 - `pnpm typecheck` — `tsc --noEmit`
 - `pnpm start` — run compiled output
+
+## Naming Conventions (enforced in code review)
+- **No single-letter or cryptic variable names.** Exceptions: loop counters `i`, `j`, `k`.
+- **Prisma transaction client:** always `trx`, never `tx`.
+- **Upserted / saved DB records:** prefix with `saved` or name the entity explicitly — e.g. `savedPackage`, `savedCve`, not `p` or `c`.
+- **Comparison results in sort callbacks:** name what is being compared — e.g. `cveIdOrder`, not `c`.
+- **Map keys that store DB ids:** use descriptive names — e.g. `packageIdByName`, `cveDbIdByCveId`, not `pkgMap` or `cveMap`.
 
 ## Quality Gates
 Claude MUST run `pnpm lint && pnpm typecheck && pnpm test` before suggesting any code changes or commits.

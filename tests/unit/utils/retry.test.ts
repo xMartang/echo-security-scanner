@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { Prisma } from '@prisma/client';
-import { retryOnPrismaError } from '@/utils/retry.js';
+import { retryOnDBError } from '@/utils/db/retry.js';
 
 function makeDeadlockError(): Prisma.PrismaClientKnownRequestError {
   return new Prisma.PrismaClientKnownRequestError('deadlock detected', {
@@ -23,10 +23,10 @@ function makeOtherError(): Prisma.PrismaClientKnownRequestError {
   });
 }
 
-describe('retryOnPrismaError', () => {
+describe('retryOnDBError', () => {
   it('returns immediately on success', async () => {
     const fn = jest.fn<() => Promise<string>>().mockResolvedValue('ok');
-    const result = await retryOnPrismaError(fn);
+    const result = await retryOnDBError(fn);
     expect(result).toBe('ok');
     expect(fn).toHaveBeenCalledTimes(1);
   });
@@ -39,14 +39,14 @@ describe('retryOnPrismaError', () => {
       return Promise.resolve('success');
     });
 
-    const result = await retryOnPrismaError(fn, { baseDelayMs: 1 });
+    const result = await retryOnDBError(fn, { baseDelayMs: 1 });
     expect(result).toBe('success');
     expect(fn).toHaveBeenCalledTimes(3);
   });
 
   it('throws immediately on non-deadlock Prisma error (no retry)', async () => {
     const fn = jest.fn<() => Promise<string>>().mockRejectedValue(makeOtherError());
-    await expect(retryOnPrismaError(fn, { baseDelayMs: 1 })).rejects.toMatchObject({
+    await expect(retryOnDBError(fn, { baseDelayMs: 1 })).rejects.toMatchObject({
       code: 'P2002',
     });
     expect(fn).toHaveBeenCalledTimes(1);
@@ -54,13 +54,13 @@ describe('retryOnPrismaError', () => {
 
   it('throws immediately on non-Prisma errors (no retry)', async () => {
     const fn = jest.fn<() => Promise<string>>().mockRejectedValue(new Error('network error'));
-    await expect(retryOnPrismaError(fn, { baseDelayMs: 1 })).rejects.toThrow('network error');
+    await expect(retryOnDBError(fn, { baseDelayMs: 1 })).rejects.toThrow('network error');
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
   it('throws after exhausting maxRetries on persistent deadlock', async () => {
     const fn = jest.fn<() => Promise<string>>().mockRejectedValue(makeDeadlockError());
-    await expect(retryOnPrismaError(fn, { maxRetries: 2, baseDelayMs: 1 })).rejects.toMatchObject({
+    await expect(retryOnDBError(fn, { maxRetries: 2, baseDelayMs: 1 })).rejects.toMatchObject({
       code: 'P2034',
     });
     // initial attempt + 2 retries = 3 total calls
@@ -75,14 +75,14 @@ describe('retryOnPrismaError', () => {
       return Promise.resolve('ok');
     });
 
-    const result = await retryOnPrismaError(fn, { baseDelayMs: 1 });
+    const result = await retryOnDBError(fn, { baseDelayMs: 1 });
     expect(result).toBe('ok');
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
   it('respects custom maxRetries', async () => {
     const fn = jest.fn<() => Promise<string>>().mockRejectedValue(makeDeadlockError());
-    await expect(retryOnPrismaError(fn, { maxRetries: 1, baseDelayMs: 1 })).rejects.toBeDefined();
+    await expect(retryOnDBError(fn, { maxRetries: 1, baseDelayMs: 1 })).rejects.toBeDefined();
     expect(fn).toHaveBeenCalledTimes(2);
   });
 });

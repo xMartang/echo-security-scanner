@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install *)",
+      "PowerShell(Get-Command node, npm, pnpm, npx -ErrorAction SilentlyContinue)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(npm install -g pnpm)",
+      "PowerShell(pnpm --version)",
+      "PowerShell(npm install -g pnpm@9 2>&1)",
+      "PowerShell(Get-Command nvm, fnm, volta -ErrorAction SilentlyContinue)",
+      "PowerShell(nvm --version 2>&1)",
+      "PowerShell(fnm --version 2>&1)",
+      "PowerShell(fnm install 24 2>&1)",
+      "PowerShell(fnm use 24 2>&1)",
+      "PowerShell(fnm env --use-on-cd --shell powershell | Invoke-Expression; fnm use 24 2>&1; node --version)",
+      "PowerShell(fnm env --use-on-cd --shell power-shell | Invoke-Expression; fnm use 24 2>&1; node --version)",
+      "PowerShell($fnmDir = fnm env --shell cmd 2>&1 | Where-Object { $_ -match 'PATH' } | ForEach-Object { \\($_ -split '\"'\\)[1] }; Write-Host \"FNM dir: $fnmDir\"; ls \"$env:APPDATA\\\\fnm\\\\node-versions\\\\\" 2>&1 | Select-Object -First 10)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; node --version; npm --version; npm install -g pnpm 2>&1 | Select-Object -Last 5; pnpm --version)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; pnpm install 2>&1)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; pnpm approve-builds 2>&1)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; pnpm approve-builds --all 2>&1)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; pnpm install 2>&1 | Select-Object -Last 20)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; pnpm rebuild 2>&1 | Select-Object -Last 20)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; pnpm lint 2>&1)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; pnpm lint 2>&1; pnpm typecheck 2>&1)",
+      "PowerShell(New-Item -ItemType Directory -Force s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner\\\\src)",
+      "PowerShell(New-Item -ItemType Directory -Force s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner\\\\tests\\\\unit)",
+      "PowerShell(New-Item -ItemType Directory -Force s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner\\\\tests\\\\integration)",
+      "PowerShell(New-Item -ItemType Directory -Force s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner\\\\tests\\\\fixtures)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; pnpm lint 2>&1; Write-Host \"---LINT DONE---\"; pnpm typecheck 2>&1; Write-Host \"---TYPECHECK DONE---\")",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; git add package.json tsconfig.json tsconfig.build.json eslint.config.js jest.config.mjs .npmrc src/index.ts src/.gitkeep tests/ 2>&1; git status --short 2>&1)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; git add pnpm-lock.yaml pnpm-workspace.yaml 2>&1; git commit -m \"chore: bootstrap pnpm + tsconfig + jest + eslint\" 2>&1)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; pnpm dlx husky init 2>&1)",
+      "PowerShell($node24 = \"$env:APPDATA\\\\fnm\\\\node-versions\\\\v24.15.0\\\\installation\"; $env:PATH = \"$node24;$env:PATH\"; Set-Location s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner; git add .husky/pre-commit lint-staged.config.mjs package.json 2>&1; git commit -m \"chore: add husky pre-commit hook \\(lint + typecheck\\)\" 2>&1)",
+      "PowerShell(New-Item -ItemType Directory -Force s:\\\\Projects\\\\Job\\\\Echo\\\\echo-security-scanner\\\\src\\\\config)"
+    ]
+  }
+}

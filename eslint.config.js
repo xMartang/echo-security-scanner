@@ -29,7 +29,7 @@ export default tseslint.config(
       'node_modules/**',
       'jest.config.mjs',
       'eslint.config.js',
-      'src/utils/log-transport.mjs',
+      'src/utils/log/log-transport.mjs',
     ],
   },
 );

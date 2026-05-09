@@ -25,54 +25,54 @@ export async function persistScanResults(
     a.name.localeCompare(b.name),
   );
   const sortedVulns = [...result.vulnerabilities].sort((a, b) => {
-    const c = a.cveId.localeCompare(b.cveId);
-    return c !== 0 ? c : a.packageName.localeCompare(b.packageName);
+    const cveIdOrder = a.cveId.localeCompare(b.cveId);
+    return cveIdOrder !== 0 ? cveIdOrder : a.packageName.localeCompare(b.packageName);
   });
 
-  await db.$transaction(async (tx) => {
+  await db.$transaction(async (trx) => {
     // 1. Upsert Image — establishes the FK anchor for all join tables.
-    const image = await tx.image.upsert({
+    const image = await trx.image.upsert({
       where: { name_tag: { name: imageName, tag: imageTag } },
       create: { name: imageName, tag: imageTag },
       update: {},
     });
 
     // 2. Upsert Packages (sorted by name).
-    const pkgMap = new Map<string, number>(); // name → id
+    const packageIdByName = new Map<string, number>(); // package name → db id
     for (const pkg of sortedPackages) {
-      const p = await tx.package.upsert({
+      const savedPackage = await trx.package.upsert({
         where: { name: pkg.name },
         create: { name: pkg.name },
         update: {},
       });
-      pkgMap.set(pkg.name, p.id);
+      packageIdByName.set(pkg.name, savedPackage.id);
     }
 
     // 3. Upsert CVEs (sorted by cveId; update severity/description on each run
     //    in case Trivy revises them in a subsequent database update).
-    const cveMap = new Map<string, number>(); // cveId string → db id
-    for (const vuln of sortedVulns) {
-      if (cveMap.has(vuln.cveId)) continue; // deduplicate same CVE across packages
-      const c = await tx.cve.upsert({
-        where: { cveId: vuln.cveId },
+    const cveDbIdByCveId = new Map<string, number>(); // cve string id → db row id
+    for (const vulnerability of sortedVulns) {
+      if (cveDbIdByCveId.has(vulnerability.cveId)) continue; // deduplicate same CVE across packages
+      const savedCve = await trx.cve.upsert({
+        where: { cveId: vulnerability.cveId },
         create: {
-          cveId: vuln.cveId,
-          severity: vuln.severity,
-          description: vuln.description,
+          cveId: vulnerability.cveId,
+          severity: vulnerability.severity,
+          description: vulnerability.description,
         },
         update: {
-          severity: vuln.severity,
-          description: vuln.description,
+          severity: vulnerability.severity,
+          description: vulnerability.description,
         },
       });
-      cveMap.set(vuln.cveId, c.id);
+      cveDbIdByCveId.set(vulnerability.cveId, savedCve.id);
     }
 
     // 4. Upsert ImagePackage join rows.
     for (const pkg of sortedPackages) {
-      const packageId = pkgMap.get(pkg.name);
+      const packageId = packageIdByName.get(pkg.name);
       if (packageId === undefined) continue;
-      await tx.imagePackage.upsert({
+      await trx.imagePackage.upsert({
         where: { imageId_packageId: { imageId: image.id, packageId } },
         create: { imageId: image.id, packageId },
         update: {},
@@ -80,34 +80,39 @@ export async function persistScanResults(
     }
 
     // 5. Upsert ImageVulnerability join rows (sorted by (cveId, packageId)).
-    const sortedIvKeys = sortedVulns
-      .map((v) => ({ vuln: v, cveDbId: cveMap.get(v.cveId), pkgDbId: pkgMap.get(v.packageName) }))
-      .filter((x): x is { vuln: typeof sortedVulns[number]; cveDbId: number; pkgDbId: number } =>
-        x.cveDbId !== undefined && x.pkgDbId !== undefined,
+    const sortedImageVulnKeys = sortedVulns
+      .map((vulnerability) => ({
+        vulnerability,
+        cveDbId: cveDbIdByCveId.get(vulnerability.cveId),
+        packageDbId: packageIdByName.get(vulnerability.packageName),
+      }))
+      .filter(
+        (entry): entry is { vulnerability: typeof sortedVulns[number]; cveDbId: number; packageDbId: number } =>
+          entry.cveDbId !== undefined && entry.packageDbId !== undefined,
       )
-      .sort((a, b) => a.cveDbId - b.cveDbId || a.pkgDbId - b.pkgDbId);
+      .sort((a, b) => a.cveDbId - b.cveDbId || a.packageDbId - b.packageDbId);
 
-    for (const { vuln, cveDbId, pkgDbId } of sortedIvKeys) {
-      await tx.imageVulnerability.upsert({
+    for (const { vulnerability, cveDbId, packageDbId } of sortedImageVulnKeys) {
+      await trx.imageVulnerability.upsert({
         where: {
-          imageId_cveId_packageId: { imageId: image.id, cveId: cveDbId, packageId: pkgDbId },
+          imageId_cveId_packageId: { imageId: image.id, cveId: cveDbId, packageId: packageDbId },
         },
         create: {
           imageId: image.id,
           cveId: cveDbId,
-          packageId: pkgDbId,
-          installedVersion: vuln.installedVersion,
-          fixedVersion: vuln.fixedVersion,
+          packageId: packageDbId,
+          installedVersion: vulnerability.installedVersion,
+          fixedVersion: vulnerability.fixedVersion,
         },
         update: {
-          installedVersion: vuln.installedVersion,
-          fixedVersion: vuln.fixedVersion,
+          installedVersion: vulnerability.installedVersion,
+          fixedVersion: vulnerability.fixedVersion,
         },
       });
     }
 
     // 6. Mark Image SUCCESS — same transaction, so atomically committed with all upserts.
-    await tx.image.update({
+    await trx.image.update({
       where: { id: image.id },
       data: {
         status: ScanStatus.SUCCESS,
