@@ -54,7 +54,9 @@ COPY --chown=nodeapp:nodeapp package.json ./
 
 EXPOSE 3000
 
-CMD ["node", "dist/api.js"]
+# Run migrations then start the API.
+# prisma migrate deploy is idempotent — safe to run on every boot.
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/api.js"]
 
 # ── Stage 4: bullmq-runtime ───────────────────────────────────────────────────
 # Extends api-runtime with the Trivy CLI binary so the sandboxed processor
