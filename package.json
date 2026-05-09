@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prepare": "husky"
+    "prepare": "node -e \"if(process.env.HUSKY==='0'||process.env.CI)process.exit(0)\" && husky || true"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
