@@ -3,7 +3,7 @@
 A background scanning service that periodically checks container images for CVE vulnerabilities using Trivy, persists results in PostgreSQL via Prisma, and exposes a REST API built with Express.
 
 ## Tech Stack & Infrastructure
-- **Runtime:** Node.js (v20+) / TypeScript (strict mode)
+- **Runtime:** Node.js (v24+, as 24 is the Active LTS) / TypeScript (strict mode)
 - **Package Manager:** pnpm
 - **Framework:** Express
 - **Database:** PostgreSQL
