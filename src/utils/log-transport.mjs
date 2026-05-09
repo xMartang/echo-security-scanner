@@ -12,10 +12,14 @@
  *   api.debug.1.log, api.debug.2.log, … (daily + 50 MB rotation, 7 files)
  */
 
+import pino from 'pino';
 import roll from 'pino-roll';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
+
+const { values: LOG_LEVELS } = pino.levels;
+// LOG_LEVELS = { trace: 10, debug: 20, info: 30, warn: 40, error: 50, fatal: 60 }
 
 export default async function transport(opts) {
   const { dir = './logs/local', serviceName = 'app' } = opts;
@@ -52,13 +56,13 @@ export default async function transport(opts) {
   }
 
   function route(level, output) {
-    if (level === 20) {
+    if (level === LOG_LEVELS.debug) {
       if (streams.debug) streams.debug.write(output);
       else { pending.debug.push(output); getStream('debug').catch(() => undefined); }
-    } else if (level === 30 || level === 40) {
+    } else if (level === LOG_LEVELS.info || level === LOG_LEVELS.warn) {
       if (streams.info) streams.info.write(output);
       else { pending.info.push(output); getStream('info').catch(() => undefined); }
-    } else if (level >= 50) {
+    } else if (level >= LOG_LEVELS.error) {
       if (streams.error) streams.error.write(output);
       else { pending.error.push(output); getStream('error').catch(() => undefined); }
     }
