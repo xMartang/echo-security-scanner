@@ -8,8 +8,27 @@ export type DeadlockRetryOptions = {
 };
 
 /**
- * Wraps an async function and retries it automatically when Postgres reports a
- * deadlock or serialisation failure (Prisma error code P2034).
+ * Prisma error codes that indicate a transient condition the caller can safely
+ * retry without changing the query:
+ *
+ *  P2034 — Deadlock or write-conflict (Postgres 40001/40P01). Caused by
+ *          concurrent transactions acquiring locks in different orders.
+ *
+ *  P2024 — Connection pool timeout. The pool was exhausted; a brief pause
+ *          and retry often succeeds once an in-flight query finishes.
+ */
+const RETRIABLE_CODES = new Set(['P2034', 'P2024']);
+
+function isRetriable(err: unknown): err is Prisma.PrismaClientKnownRequestError {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    RETRIABLE_CODES.has(err.code)
+  );
+}
+
+/**
+ * Wraps an async function and retries it automatically on transient Prisma
+ * errors (see RETRIABLE_CODES above).
  *
  * Backoff: `baseDelayMs * 2^attempt * uniform(0.75, 1.25)` — exponential with
  * ±25% jitter so concurrent workers don't all retry at the same instant.
@@ -26,10 +45,7 @@ export async function withDeadlockRetry<T>(
     try {
       return await fn();
     } catch (err) {
-      const isDeadlock =
-        err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2034';
-
-      if (!isDeadlock || attempt >= maxRetries) {
+      if (!isRetriable(err) || attempt >= maxRetries) {
         throw err;
       }
 

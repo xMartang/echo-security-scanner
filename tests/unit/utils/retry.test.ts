@@ -9,6 +9,13 @@ function makeDeadlockError(): Prisma.PrismaClientKnownRequestError {
   });
 }
 
+function makePoolTimeoutError(): Prisma.PrismaClientKnownRequestError {
+  return new Prisma.PrismaClientKnownRequestError('connection pool timeout', {
+    code: 'P2024',
+    clientVersion: '6.0.0',
+  });
+}
+
 function makeOtherError(): Prisma.PrismaClientKnownRequestError {
   return new Prisma.PrismaClientKnownRequestError('unique constraint', {
     code: 'P2002',
@@ -58,6 +65,19 @@ describe('withDeadlockRetry', () => {
     });
     // initial attempt + 2 retries = 3 total calls
     expect(fn).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries P2024 (connection pool timeout) the same as P2034', async () => {
+    let calls = 0;
+    const fn = jest.fn<() => Promise<string>>().mockImplementation(() => {
+      calls++;
+      if (calls < 2) return Promise.reject(makePoolTimeoutError());
+      return Promise.resolve('ok');
+    });
+
+    const result = await withDeadlockRetry(fn, { baseDelayMs: 1 });
+    expect(result).toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(2);
   });
 
   it('respects custom maxRetries', async () => {
