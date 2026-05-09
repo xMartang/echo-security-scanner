@@ -2,27 +2,26 @@ import { Worker } from 'bullmq';
 import type { Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
 import { env } from '@/config/env.js';
-import { IMAGES } from '@/config/images.js';
-import { scanQueue } from '@/queue/queue.js';
-import { processSchedulerTick } from '@/queue/jobs/scheduler-tick.job.js';
+import { enqueueScanJobs, processSchedulerTick } from '@/queue/jobs/scheduler-tick.job.js';
+import type { SchedulerTickJobData } from '@/types/job-payload.js';
 
 /**
  * Registers (or refreshes) the repeatable scheduler tick on `schedulerQueue`
- * and starts an in-process Worker that processes tick jobs by fan-out to the
- * `image-scan` queue.
+ * and starts an in-process Worker that processes tick jobs by fan-out.
  *
- * Also enqueues an immediate fan-out on startup so the first batch runs
+ * `inboundScanQueue` is the queue that scan jobs are added to; injected so
+ * integration tests can pass a queue backed by a test Redis instance without
+ * relying on the module-level singleton.
+ *
+ * Also triggers an immediate fan-out on startup so the first batch runs
  * without waiting up to SCAN_INTERVAL_MS.
- *
- * Returns the tick Worker so the bullmq.ts entrypoint can close it during
- * graceful shutdown.
  */
 export async function setupScheduler(
   schedulerQueue: Queue,
+  inboundScanQueue: Queue,
   connection: Redis,
 ): Promise<Worker> {
-  // Register (or refresh) the repeatable job that fires every SCAN_INTERVAL_MS.
-  // upsertJobScheduler is idempotent — safe to call on every restart.
+  // Idempotent — safe to call on every restart.
   await schedulerQueue.upsertJobScheduler(
     'scan-all-images',
     { every: env.SCAN_INTERVAL_MS },
@@ -32,28 +31,14 @@ export async function setupScheduler(
     },
   );
 
-  // In-process Worker for the scheduler queue (not sandboxed — pure enqueue, no Trivy).
-  const tickWorker = new Worker<import('@/types/job-payload.js').SchedulerTickJobData>(
+  const tickWorker = new Worker<SchedulerTickJobData>(
     'image-scheduler',
     processSchedulerTick,
     { connection, concurrency: 1 },
   );
 
-  // Immediate fan-out so the first scan batch starts on boot rather than after
-  // the first SCAN_INTERVAL_MS delay.
-  const now = new Date().toISOString();
-  const initialJobs = IMAGES.map((img) => ({
-    name: 'scan-image',
-    data: { imageName: img.name, imageTag: img.tag },
-    opts: {
-      jobId: `${img.name}:${img.tag}:${now}`,
-      attempts: 3,
-      backoff: { type: 'exponential' as const, delay: 5_000 },
-      removeOnComplete: { count: 100 },
-      removeOnFail: { count: 500 },
-    },
-  }));
-  await scanQueue.addBulk(initialJobs);
+  // Immediate fan-out — first scan starts on boot, not after first interval.
+  await enqueueScanJobs(inboundScanQueue, new Date().toISOString());
 
   return tickWorker;
 }

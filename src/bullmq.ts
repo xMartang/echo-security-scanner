@@ -55,7 +55,7 @@ async function main() {
   logger.info({ concurrency: scanWorker.concurrency }, 'scan worker started');
 
   // Setup scheduler: register repeatable tick + immediate fan-out on startup.
-  const tickWorker = await setupScheduler(schedulerQueue, connection);
+  const tickWorker = await setupScheduler(schedulerQueue, scanQueue, connection);
   logger.info({ intervalMs: env.SCAN_INTERVAL_MS }, 'scheduler started');
 
   // ── Graceful shutdown ───────────────────────────────────────────────────────
