@@ -1,5 +1,7 @@
 import { Prisma } from '@prisma/client';
 
+const MAX_BACKOFF_DELAY_MS: number = 10_000; // Cap backoff at 10 seconds to avoid excessively long waits
+
 export type DBRetryOptions = {
   /** Maximum number of retry attempts (default: 3). */
   maxRetries?: number;
@@ -49,7 +51,10 @@ export async function retryOnDBError<T>(
         throw err;
       }
 
-      const delay = baseDelayMs * 2 ** attempt * (0.75 + Math.random() * 0.5);
+      const delay = Math.min(
+        baseDelayMs * 2 ** attempt * (0.75 + Math.random() * 0.5),
+        MAX_BACKOFF_DELAY_MS
+      );
       await new Promise<void>((resolve) => setTimeout(resolve, delay));
     }
   }

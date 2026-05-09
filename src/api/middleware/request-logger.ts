@@ -3,8 +3,7 @@ import type pino from 'pino';
 
 /**
  * Returns middleware that logs each completed request: method, path, status,
- * and duration in milliseconds. Uses the provided pino logger (injected so
- * tests can pass a silent logger without env side-effects).
+ * and duration in milliseconds. Uses the provided pino logger.
  */
 export function createRequestLogger(logger: pino.Logger): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {

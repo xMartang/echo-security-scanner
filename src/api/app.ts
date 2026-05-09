@@ -40,7 +40,6 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api/images', createImagesRouter(imageRepo, cveRepo));
   app.use('/api/cves', createCvesRouter(imageRepo, cveRepo));
 
-  // Global error handler must be last — 4-arg Express signature
   app.use(createErrorHandler(logger));
 
   return app;
