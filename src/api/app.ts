@@ -37,8 +37,8 @@ export function createApp(deps: AppDeps): Express {
   app.use(createRequestLogger(logger));
 
   app.use('/health', createHealthRouter(healthService));
-  app.use('/api/images', createImagesRouter(imageRepo, cveRepo));
-  app.use('/api/cves', createCvesRouter(imageRepo, cveRepo));
+  app.use('/api/images', createImagesRouter(imageRepo, cveRepo, logger));
+  app.use('/api/cves', createCvesRouter(imageRepo, cveRepo, logger));
 
   app.use(createErrorHandler(logger));
 

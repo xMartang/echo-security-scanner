@@ -30,8 +30,13 @@ export async function pruneStaleVulnerabilities(db: PrismaClient = prisma): Prom
     where: { lastSeenAt: { lt: cutoff } },
   });
 
-  logger.info(
-    { count, cutoffDate: cutoff.toISOString(), retentionDays: RETENTION_DAYS },
-    'pruned stale ImageVulnerability rows',
-  );
+  if (count > 0) {
+    logger.info(
+      { count, cutoffDate: cutoff.toISOString(), retentionDays: RETENTION_DAYS },
+      'pruned stale ImageVulnerability rows',
+    );
+  }
+  else {
+    logger.info({ cutoffDate: cutoff.toISOString(), retentionDays: RETENTION_DAYS }, 'no stale ImageVulnerability rows to prune');
+  }
 }
