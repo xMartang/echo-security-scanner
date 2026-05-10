@@ -21,8 +21,6 @@ const logger = createLogger({
   level: env.LOG_LEVEL,
 });
 
-// "-- Unhandled error guards "------------------------------------------------------------------------------------------------------
-
 process.on('unhandledRejection', (reason) => {
   logger.fatal({ err: reason }, 'unhandled rejection -- exiting');
   process.exit(1);
@@ -33,10 +31,8 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-// "-- Main "----------------------------------------------------------------------------------------------------------------------------------------
-
 async function main() {
-  logger.info('bullmq entrypoint starting');
+  logger.info({ redisUrl: env.REDIS_URL, trivyUrl: env.TRIVY_SERVER_URL }, 'bullmq starting');
 
   // Recover images left in SCANNING state by a previous crashed worker.
   const recoveredCount = await imageRepository.markStuckScanningAsFailed();
@@ -45,17 +41,17 @@ async function main() {
   }
 
   // Create the sandboxed scan worker (forked child processes, one per job).
+  logger.debug({ queue: 'image-scan' }, 'setting up sandboxed scan worker');
   const scanWorker = createScanWorker(connection);
-  logger.info({ concurrency: scanWorker.concurrency }, 'scan worker started');
+  logger.info({ queue: 'image-scan', concurrency: scanWorker.concurrency }, 'scan worker ready');
 
   // Setup scheduler: register all repeatable tasks.
+  logger.debug({ schedulerQueue: 'image-scheduler', scanQueue: 'image-scan' }, 'setting up scheduler and hygiene worker');
   const [tickWorker, hygieneWorker] = await setupScheduler(schedulerQueue, scanQueue, connection);
-  logger.info({ intervalMs: env.SCAN_INTERVAL_MS }, 'scheduler started');
-
-  // "-- Graceful shutdown "------------------------------------------------------------------------------------------------------------
+  logger.info({ intervalMs: env.SCAN_INTERVAL_MS }, 'scheduler ready');
 
   async function shutdown(signal: string): Promise<void> {
-    logger.info({ signal }, 'shutdown signal received, draining bullmq');
+    logger.info({ signal }, 'shutdown signal received');
 
     // Hard-kill safety net: started AFTER SIGTERM, not at startup.
     const hardKillTimer = setTimeout(() => {
@@ -64,17 +60,24 @@ async function main() {
     }, 25_000).unref();
 
     try {
+      logger.debug('closing scan queue and scheduler queue');
       await scanQueue.close();
       await schedulerQueue.close();
 
       // Give in-flight sandboxed jobs up to 20 s to finish before moving on.
+      logger.debug('draining scan worker (20 s timeout)');
       await Promise.race([
         scanWorker.close(),
         new Promise<void>((resolve) => setTimeout(resolve, 20_000)),
       ]);
+
+      logger.debug('closing scheduler tick worker');
       await tickWorker.close();
+
+      logger.debug('closing hygiene worker');
       await hygieneWorker.close();
 
+      logger.debug('disconnecting Prisma and Redis');
       await prisma.$disconnect();
       await connection.quit();
     } catch (shutdownErr) {

@@ -1,9 +1,16 @@
 import { execa } from 'execa';
 import type { Readable } from 'node:stream';
 import { env } from '@/bullmq/config/env.js';
+import { createLogger } from '@/common/utils/log/logger.js';
 import { ScanFailedError } from '@/common/utils/errors.js';
 import { parseTrivyOutput } from '@/bullmq/tasks/scanners/trivy/utils/json-stream.js';
 import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
+
+const logger = createLogger({
+  serviceName: 'trivy-scanner',
+  dir: env.LOG_DIR,
+  level: env.LOG_LEVEL,
+});
 
 export type ScanOutput = {
   result: ScanResult;
@@ -28,12 +35,11 @@ export async function parseScanOutputStream(stream: Readable): Promise<ScanResul
  */
 export async function scan(imageName: string, imageTag: string): Promise<ScanOutput> {
   const imageRef = `${imageName}:${imageTag}`;
+  const args = ['image', '--server', env.TRIVY_SERVER_URL, '--format', 'json', '--quiet', imageRef];
 
-  const trivyProcess = execa(
-    'trivy',
-    ['image', '--server', env.TRIVY_SERVER_URL, '--format', 'json', '--quiet', imageRef],
-    { stdout: 'pipe', stderr: 'pipe' },
-  );
+  logger.debug({ cmd: `trivy ${args.join(' ')}` }, 'executing trivy scan');
+
+  const trivyProcess = execa('trivy', args, { stdout: 'pipe', stderr: 'pipe' });
 
   try {
     // Parse stdout while the process is still running.
@@ -41,6 +47,16 @@ export async function scan(imageName: string, imageTag: string): Promise<ScanOut
     if (!trivyProcess.stdout) throw new Error('trivy process has no stdout pipe');
     const resultPromise = parseScanOutputStream(trivyProcess.stdout);
     const [scanResult, processExecution] = await Promise.all([resultPromise, trivyProcess]);
+
+    logger.debug(
+      {
+        image: imageRef,
+        packages: scanResult.packages.length,
+        vulnerabilities: scanResult.vulnerabilities.length,
+        exitCode: processExecution.exitCode,
+      },
+      'trivy scan completed',
+    );
 
     return { result: scanResult, stderr: processExecution.stderr ?? '' };
   } catch (err) {

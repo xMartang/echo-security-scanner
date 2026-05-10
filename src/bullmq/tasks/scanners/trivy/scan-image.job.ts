@@ -32,10 +32,10 @@ function getSharedPrisma(): PrismaClient {
 }
 
 // Sandboxed processors run in child processes separate from the main bullmq
-// process. Using SERVICE_NAME + '-scan' routes logs to scan-processor.*.log,
+// process. Using 'trivy-scanner' routes logs to trivy-scanner.*.log,
 // avoiding concurrent multi-process writes to the same rotating log file.
 const logger = createLogger({
-  serviceName: `${env.SERVICE_NAME}-scan`,
+  serviceName: 'trivy-scanner',
   dir: env.LOG_DIR,
   level: env.LOG_LEVEL,
 });
@@ -63,7 +63,7 @@ export async function processScanJob(
   try {
     // 2. Invoke Trivy via execa; stream output through json-stream pipeline.
     const { result, stderr } = await scan(imageName, imageTag);
-    if (stderr) logger.debug({ image: imageRef, stderr }, 'trivy stderr output');
+    if (stderr) logger.warn({ image: imageRef, stderr }, 'Trivy has non-empty stderr output.');
 
     // 3. Ingest CVE results -- wrap with retryOnDBError for transient Postgres errors.
     await retryOnDBError(
