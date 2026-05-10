@@ -4,16 +4,15 @@ import type { Redis } from 'ioredis';
 import { env } from '@/bullmq/config/env.js';
 import { processSchedulerTick } from '@/bullmq/tasks/scanners/trivy/scheduler-tick.job.js';
 import { pruneStaleVulnerabilities } from '@/bullmq/tasks/hygiene/prune-stale-vulnerabilities.job.js';
+import { HYGIENE_INTERVAL_MS } from '@/bullmq/tasks/hygiene/index.js';
 import type { SchedulerTickJobData } from '@/bullmq/types/job-payload.js';
-
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Registers repeatable jobs and starts in-process workers.
  *
  * Currently registered tasks:
- *   1. scan-all-images   -- Trivy CVE scanner, runs every SCAN_INTERVAL_MS
- *   2. prune-stale-vulnerabilities -- weekly storage hygiene (NOT staleness logic)
+ *   1. scan-all-images              -- Trivy CVE scanner, runs every SCAN_INTERVAL_MS
+ *   2. prune-stale-vulnerabilities  -- weekly storage hygiene (NOT staleness logic)
  *
  * Adding a new task: create a module under tasks/, export a TaskConfig,
  * import it here and add another upsertJobScheduler + Worker registration.
@@ -23,8 +22,7 @@ export async function setupScheduler(
   inboundScanQueue: Queue,
   connection: Redis,
 ): Promise<Worker[]> {
-  //   -  - Task 1: Trivy image scanner   -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
-  // Idempotent -- safe to call on every restart.
+  // Task 1: Trivy image scanner -- idempotent, safe to call on every restart.
   await schedulerQueue.upsertJobScheduler(
     'scan-all-images',
     {
@@ -43,14 +41,12 @@ export async function setupScheduler(
     { connection, concurrency: 1 },
   );
 
-  //   -  - Task 2: Weekly storage hygiene   -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
-  // Deletes ImageVulnerability rows not confirmed in 30+ days. This is NOT
-  // staleness logic -- the API already excludes stale CVEs via lastSeenAt filter.
-  // This job prevents unbounded table growth over months of scanning.
+  // Task 2: Weekly storage hygiene -- deletes ImageVulnerability rows older than
+  // VULNERABILITY_RETENTION_DAYS days. NOT staleness logic; purely operational.
   const hygieneQueue = new BullQueue('hygiene', { connection });
   await hygieneQueue.upsertJobScheduler(
     'prune-stale-vulnerabilities',
-    { every: SEVEN_DAYS_MS },
+    { every: HYGIENE_INTERVAL_MS },
     { name: 'prune-stale-vulnerabilities', data: {} },
   );
 

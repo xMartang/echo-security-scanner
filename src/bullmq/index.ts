@@ -15,6 +15,11 @@ import { scanQueue, schedulerQueue } from '@/bullmq/tasks/scanners/trivy/queues.
 import { createScanWorker } from '@/bullmq/tasks/scanners/trivy/worker.js';
 import { setupScheduler } from '@/bullmq/services/scheduler.service.js';
 
+// Shutdown timing constants (internal -- not operator-configurable).
+const HARD_KILL_TIMEOUT_MS = 25_000; // force-exit if graceful shutdown hangs
+const SCAN_WORKER_DRAIN_TIMEOUT_MS = 20_000; // max time to let in-flight scans finish
+const FLUSH_WAIT_MS = 200; // brief pause so the log transport flushes to disk
+
 const logger = createLogger({
   serviceName: env.SERVICE_NAME,
   dir: env.LOG_DIR,
@@ -40,12 +45,10 @@ async function main() {
     logger.warn({ recoveredCount }, 'marked stuck SCANNING images as FAILED');
   }
 
-  // Create the sandboxed scan worker (forked child processes, one per job).
   logger.debug({ queue: 'image-scan' }, 'setting up sandboxed scan worker');
   const scanWorker = createScanWorker(connection);
   logger.info({ queue: 'image-scan', concurrency: scanWorker.concurrency }, 'scan worker ready');
 
-  // Setup scheduler: register all repeatable tasks.
   logger.debug({ schedulerQueue: 'image-scheduler', scanQueue: 'image-scan' }, 'setting up scheduler and hygiene worker');
   const [tickWorker, hygieneWorker] = await setupScheduler(schedulerQueue, scanQueue, connection);
   logger.info({ intervalMs: env.SCAN_INTERVAL_MS }, 'scheduler ready');
@@ -55,20 +58,19 @@ async function main() {
 
     // Hard-kill safety net: started AFTER SIGTERM, not at startup.
     const hardKillTimer = setTimeout(() => {
-      logger.fatal('forced exit: shutdown timed out after 25 s');
+      logger.fatal(`forced exit: shutdown timed out after ${HARD_KILL_TIMEOUT_MS / 1000} s`);
       process.exit(1);
-    }, 25_000).unref();
+    }, HARD_KILL_TIMEOUT_MS).unref();
 
     try {
       logger.debug('closing scan queue and scheduler queue');
       await scanQueue.close();
       await schedulerQueue.close();
 
-      // Give in-flight sandboxed jobs up to 20 s to finish before moving on.
-      logger.debug('draining scan worker (20 s timeout)');
+      logger.debug(`draining scan worker (${SCAN_WORKER_DRAIN_TIMEOUT_MS / 1000} s timeout)`);
       await Promise.race([
         scanWorker.close(),
-        new Promise<void>((resolve) => setTimeout(resolve, 20_000)),
+        new Promise<void>((resolve) => setTimeout(resolve, SCAN_WORKER_DRAIN_TIMEOUT_MS)),
       ]);
 
       logger.debug('closing scheduler tick worker');
@@ -86,7 +88,7 @@ async function main() {
 
     logger.info('bullmq shutdown complete');
     logger.flush?.();
-    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+    await new Promise<void>((resolve) => setTimeout(resolve, FLUSH_WAIT_MS));
 
     clearTimeout(hardKillTimer);
     process.exit(0);

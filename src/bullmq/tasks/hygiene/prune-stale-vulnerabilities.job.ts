@@ -4,7 +4,8 @@ import { env } from '@/bullmq/config/env.js';
 import type { PrismaClient } from '@prisma/client';
 
 /**
- * Hard-deletes ImageVulnerability rows not confirmed by any scanner for 30+ days.
+ * Hard-deletes ImageVulnerability rows not confirmed by any scanner for
+ * VULNERABILITY_RETENTION_DAYS days (default 30).
  *
  * This is STORAGE HYGIENE, not staleness logic. Staleness is already handled by the
  * lastSeenAt >= lastScannedAt filter in the repository layer -- stale rows are invisible
@@ -15,16 +16,17 @@ import type { PrismaClient } from '@prisma/client';
  * shared across images and are NOT touched.
  */
 
-const RETENTION_DAYS = 30;
-
 const logger = createLogger({
   serviceName: env.SERVICE_NAME,
   dir: env.LOG_DIR,
   level: env.LOG_LEVEL,
 });
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 export async function pruneStaleVulnerabilities(db: PrismaClient = prisma): Promise<void> {
-  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const retentionDays = env.VULNERABILITY_RETENTION_DAYS;
+  const cutoff = new Date(Date.now() - retentionDays * MS_PER_DAY);
 
   const { count } = await db.imageVulnerability.deleteMany({
     where: { lastSeenAt: { lt: cutoff } },
@@ -32,11 +34,13 @@ export async function pruneStaleVulnerabilities(db: PrismaClient = prisma): Prom
 
   if (count > 0) {
     logger.info(
-      { count, cutoffDate: cutoff.toISOString(), retentionDays: RETENTION_DAYS },
+      { count, cutoffDate: cutoff.toISOString(), retentionDays },
       'pruned stale ImageVulnerability rows',
     );
-  }
-  else {
-    logger.info({ cutoffDate: cutoff.toISOString(), retentionDays: RETENTION_DAYS }, 'no stale ImageVulnerability rows to prune');
+  } else {
+    logger.info(
+      { cutoffDate: cutoff.toISOString(), retentionDays },
+      'no stale ImageVulnerability rows to prune',
+    );
   }
 }

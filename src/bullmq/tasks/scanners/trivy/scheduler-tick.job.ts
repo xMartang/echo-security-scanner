@@ -11,14 +11,18 @@ const logger = createLogger({
   level: env.LOG_LEVEL,
 });
 
+// How many completed/failed job records to retain per image in BullMQ / Redis.
+// Enough history for one full day of 15-min scans (96 ticks) with some headroom.
+const COMPLETED_JOB_HISTORY = 100;
+const FAILED_JOB_HISTORY = 50;
+
 /**
  * Builds the list of scan jobs for a given set of images and tick timestamp.
  * Pure function -- exported so tests can verify job structure without touching Redis.
  *
  * jobId includes the tick timestamp so each tick produces unique IDs, enabling
- * BullMQ native job history (removeOnComplete: { count: N }) to work correctly.
- * Deduplication of concurrent scans is handled by enqueueScanJobs() via queue
- * state inspection rather than ID uniqueness.
+ * BullMQ native job history to work correctly. Deduplication of concurrent scans
+ * is handled by enqueueScanJobs() via queue state inspection rather than ID uniqueness.
  *
  * BullMQ v5 forbids ':' in custom jobIds -- '__' used as separator.
  */
@@ -30,9 +34,8 @@ export function buildScanJobs(images: readonly ImageRef[], triggeredAt: string) 
       jobId: `scan__${img.name}__${img.tag}__${triggeredAt.replace(/:/g, '')}`,
       attempts: 3,
       backoff: { type: 'exponential' as const, delay: 5_000 },
-      // Keep last 100 completed jobs visible in BullMQ Board / Redis history.
-      removeOnComplete: { count: 100 },
-      removeOnFail: { count: 50 },
+      removeOnComplete: { count: COMPLETED_JOB_HISTORY },
+      removeOnFail: { count: FAILED_JOB_HISTORY },
     },
   }));
 }

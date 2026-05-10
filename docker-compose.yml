@@ -16,9 +16,9 @@ services:
     restart: unless-stopped
     logging: *default-logging
     environment:
-      POSTGRES_USER: scanner
-      POSTGRES_PASSWORD: scanner
-      POSTGRES_DB: scanner
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "${POSTGRES_PORT}:5432"
     volumes:

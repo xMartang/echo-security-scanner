@@ -10,6 +10,7 @@ import { createCvesRouter } from '@/api/routes/cves.routes.js';
 import { createHealthService } from '@/api/services/health.service.js';
 import { createImageRepository } from '@/common/db/repositories/image.repository.js';
 import { createCveRepository } from '@/common/db/repositories/cve.repository.js';
+import { env } from '@/api/config/env.js';
 
 export type AppDeps = {
   logger: pino.Logger;
@@ -28,7 +29,7 @@ export function createApp(deps: AppDeps): Express {
   const cveRepo = createCveRepository(db);
   const healthService = createHealthService({
     db,
-    scannerStalenessThresholdMs: 30 * 60 * 1000, // 30 minutes
+    scannerStalenessThresholdMs: env.SCANNER_STALENESS_THRESHOLD_MS,
   });
 
   const app = express();

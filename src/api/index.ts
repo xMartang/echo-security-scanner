@@ -10,13 +10,16 @@ import { createLogger } from '@/common/utils/log/logger.js';
 import { prisma } from '@/common/db/client.js';
 import { createApp } from '@/api/app.js';
 
+// Shutdown timing constants (internal -- not operator-configurable).
+const HARD_KILL_TIMEOUT_MS = 20_000; // force-exit if graceful shutdown hangs
+const SERVER_CLOSE_TIMEOUT_MS = 15_000; // max time to drain in-flight HTTP requests
+const FLUSH_WAIT_MS = 200; // brief pause so the log transport flushes to disk
+
 const logger = createLogger({
   serviceName: env.SERVICE_NAME,
   dir: env.LOG_DIR,
   level: env.LOG_LEVEL,
 });
-
-//   -  - Unhandled error guards   -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 
 process.on('unhandledRejection', (reason) => {
   logger.fatal({ err: reason }, 'unhandled rejection -- exiting');
@@ -28,18 +31,11 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-//   -  - Boot   -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
-
-const app = createApp({
-  logger,
-  db: prisma,
-});
+const app = createApp({ logger, db: prisma });
 
 const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, 'api listening');
 });
-
-//   -  - Graceful shutdown   -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'shutdown signal received, draining api');
@@ -47,13 +43,13 @@ async function shutdown(signal: string): Promise<void> {
   // Hard-kill safety net: started AFTER SIGTERM, not at startup.
   // .unref() so it does not prevent the event loop from exiting naturally.
   const hardKillTimer = setTimeout(() => {
-    logger.fatal('forced exit: api shutdown timed out after 20 s');
+    logger.fatal(`forced exit: api shutdown timed out after ${HARD_KILL_TIMEOUT_MS / 1000} s`);
     process.exit(1);
-  }, 20_000).unref();
+  }, HARD_KILL_TIMEOUT_MS).unref();
 
-  // Stop accepting new connections; let in-flight requests finish (15 s cap).
+  // Stop accepting new connections; let in-flight requests finish.
   await new Promise<void>((resolve) => {
-    const timeout = setTimeout(resolve, 15_000);
+    const timeout = setTimeout(resolve, SERVER_CLOSE_TIMEOUT_MS);
     server.close(() => {
       clearTimeout(timeout);
       resolve();
@@ -63,7 +59,7 @@ async function shutdown(signal: string): Promise<void> {
   await prisma.$disconnect();
   logger.info('api shutdown complete');
   logger.flush?.();
-  await new Promise<void>((resolve) => setTimeout(resolve, 200));
+  await new Promise<void>((resolve) => setTimeout(resolve, FLUSH_WAIT_MS));
 
   clearTimeout(hardKillTimer);
   process.exit(0);
