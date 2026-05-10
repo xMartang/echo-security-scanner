@@ -4,7 +4,7 @@
 The system is split into two independently deployable services:
 
 - **API service** (`src/api/`): owns the Express HTTP layer. Reads from the database only. Has no knowledge of Redis, BullMQ, Trivy, or scanner internals.
-- **Scanner service** (`src/scanner/`): owns Redis, BullMQ, and Trivy. Writes scan results to the database. Has no HTTP server.
+- **BullMQ service** (`src/bullmq/`): general-purpose task runner. Owns Redis, BullMQ, and Trivy. Writes scan results to the database. Has no HTTP server. Tasks live under `src/bullmq/tasks/`; each exports a `TaskConfig` (see `task.types.ts`).
 
 The **database is the only contract** between the two services.
 
@@ -12,8 +12,8 @@ The **database is the only contract** between the two services.
 |---|---|
 | PostgreSQL (read) | API |
 | PostgreSQL (write) | Scanner |
-| Redis / BullMQ | Scanner only |
-| Trivy | Scanner only |
+| Redis / BullMQ | BullMQ service only |
+| Trivy | BullMQ service only |
 | HTTP / Express | API only |
 
 ## Trivy Client/Server Strategy
@@ -62,7 +62,9 @@ Never delete and re-insert scan results; always upsert to preserve history and a
 - **Reasoning:** Trivy scans are CPU-intensive; this prevents CPU starvation of the main Express thread and the Postgres/Redis containers.
 
 ## Source Layout
-- Queue and worker code lives in `src/scanner/` (previously `src/queue/`).
-- Scanner services (ScannerService, SchedulerService, PersistenceService) live in `src/scanner/services/`.
+- BullMQ infrastructure (queue, worker, scheduler) lives in `src/bullmq/`.
+- Trivy-specific task logic lives in `src/bullmq/tasks/scanners/trivy/`.
+- Hygiene task lives in `src/bullmq/tasks/hygiene/`.
 - API services (HealthService) live in `src/api/services/`.
 - Shared code (DB client, repositories, logger, errors) lives in `src/common/`.
+- The `TaskConfig` interface at `src/bullmq/tasks/task.types.ts` is the contract new tasks must satisfy.

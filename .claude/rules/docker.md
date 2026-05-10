@@ -4,11 +4,11 @@
 The compose stack has two application services built from separate Dockerfiles:
 
 - **`api`** — built from `src/api/Dockerfile`. Contains only the Express app; no Trivy binary.
-- **`scanner`** — built from `src/scanner/Dockerfile`. Contains BullMQ worker + Trivy client. Previously named `bullmq`.
+- **`bullmq`** — built from `src/bullmq/Dockerfile`. Contains BullMQ worker + Trivy client. Previously named `scanner`.
 
 ## Service Connectivity
 - **trivy-server:** Must expose port 8080 to the internal Docker network.
-- **scanner:** Must wait for `trivy-server` to be healthy before starting scans.
+- **bullmq:** Must wait for `trivy-server` to be healthy before starting scans.
 
 ## The Docker Socket Strategy
 - **Option A (Shared Socket):** Mount `/var/run/docker.sock` to **both** the Scanner and the Trivy Server. This allows the Server to pull and scan images directly from the host's daemon.

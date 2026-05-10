@@ -22,10 +22,12 @@ A background service that periodically scans 10 fixed container images for CVE v
 The system is split into two independently deployable services:
 
 - **API service** (`src/api/`): serves the REST endpoints with read-only DB queries. Has no knowledge of Redis, BullMQ, or Trivy.
-- **Scanner service** (`src/scanner/`): scans images every 15 minutes via BullMQ; each image is a separate sandboxed job. Writes results to PostgreSQL. Owns Redis and Trivy.
+- **BullMQ service** (`src/bullmq/`): general-purpose task runner. Currently runs two tasks:
+  - **Trivy scanner** (`tasks/scanners/trivy/`): scans images every 15 minutes; each image is a separate sandboxed job. Writes results to PostgreSQL.
+  - **Hygiene job** (`tasks/hygiene/`): runs weekly and hard-deletes `ImageVulnerability` rows older than 30 days (see [CVE staleness](#cve-staleness) below).
 - **Trivy server**: runs in server mode; the scanner calls `trivy image --server` (no Docker socket needed on the scanner).
-- **PostgreSQL** + **Prisma**: stores images, CVEs, packages, and join tables. The database is the only contract between API and Scanner.
-- **Redis**: BullMQ job queue and scheduler backend (Scanner only).
+- **PostgreSQL** + **Prisma**: stores images, CVEs, packages, and join tables. The database is the only contract between API and BullMQ.
+- **Redis**: BullMQ job queue and scheduler backend (BullMQ service only).
 
 ---
 
@@ -327,10 +329,44 @@ docker compose down -v
 
 ---
 
+## CVE staleness
+
+The scanner uses an upsert-only persistence approach — it never deletes CVE records. Instead, every scan updates `ImageVulnerability.lastSeenAt` to `now()` for each CVE it finds. The same timestamp is also written to `Image.lastScannedAt` at the end of the scan.
+
+**API filtering:** all vulnerability queries apply the filter `lastSeenAt >= lastScannedAt`. This means:
+- CVEs confirmed by the latest scan: `lastSeenAt === lastScannedAt` → **included**
+- CVEs no longer found (patched, withdrawn, reclassified): `lastSeenAt < lastScannedAt` → **excluded**
+
+Stale rows are preserved in the database as audit data — `firstSeenAt` records when a CVE was first detected, and `lastSeenAt` records when it was last confirmed. This is useful for understanding exposure windows.
+
+**Weekly hygiene job:** a separate BullMQ repeatable job runs every 7 days and hard-deletes `ImageVulnerability` rows where `lastSeenAt < now() - 30 days`. This is purely operational — preventing unbounded table growth. It does NOT affect the staleness logic above. Only `ImageVulnerability` rows are deleted; `Cve` and `Package` rows (reference data) are never touched.
+
+---
+
+## Adding a new task or scanner
+
+Tasks live under `src/bullmq/tasks/`. Each task module exports a `TaskConfig` (see `src/bullmq/tasks/task.types.ts`).
+
+**To add a new scanner** (e.g. Grype):
+1. Create `src/bullmq/tasks/scanners/grype/` alongside `trivy/`
+2. Implement `scan-image.job.ts`, `scanner.service.ts`, `scheduler-tick.job.ts` following the Trivy pattern
+3. Export a `TaskConfig` from `index.ts`
+4. Import it in `src/bullmq/services/scheduler.service.ts` and add a `upsertJobScheduler` + `Worker` registration
+
+**To add an unrelated background task** (e.g. report generation):
+1. Create `src/bullmq/tasks/<name>/` alongside `hygiene/`
+2. Implement the processor function
+3. Export a `TaskConfig` from `index.ts`
+4. Register it in `scheduler.service.ts`
+
+The scheduler does NOT auto-discover tasks — adding a new task requires one import in `scheduler.service.ts`.
+
+---
+
 ## Notable implementation decisions
 
-- **Sandboxed BullMQ processors**: each scan job forks a child process inside the Scanner service. Crash-isolates Trivy and stream-json failures at the cost of one extra process per concurrent job.
-- **Stable jobIds** (`scan__nginx__1.19`): BullMQ v5 forbids `:` in custom jobIds. A stable (no timestamp) ID means at most one active scan per image in the queue, preventing duplicate concurrent scans.
+- **Sandboxed BullMQ processors**: each scan job forks a child process. Crash-isolates Trivy and stream-json failures at the cost of one extra process per concurrent job.
+- **Unique jobIds with timestamp** (`scan__nginx__1.19__<ts>`): BullMQ v5 forbids `:` in custom jobIds. Timestamps make IDs unique so BullMQ native history works. Duplicate scan prevention is handled via queue-state inspection (`getJobs(['waiting','active'])`) before each enqueue.
 - **Sequential test execution** (`--runInBand`): three integration test suites each start testcontainers (Postgres and/or Redis). Parallel execution exhausts resources on typical dev machines.
 - **Cumulative log routing**: `debug.log` receives all levels; `info.log` receives info and above; `error.log` receives error and fatal only — so operators can grep debug.log for the full picture or error.log for just failures.
 - **`prisma` in production deps**: `prisma migrate deploy` runs on API startup so the CLI must be present in the production image.

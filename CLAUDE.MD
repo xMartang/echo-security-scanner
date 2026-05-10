@@ -37,15 +37,27 @@ src/
       health.service.ts  # DB + scanner staleness check
     types/
       api-envelope.ts
-  scanner/        # BullMQ scan worker service
-    index.ts      # Scanner entrypoint
-    config/env.ts # Scanner env (extends common + REDIS_URL, TRIVY_SERVER_URL, SCAN_INTERVAL_MS)
-    jobs/         # BullMQ job processors
+  bullmq/         # BullMQ task runner service (renamed from scanner/)
+    index.ts      # BullMQ entrypoint
+    config/env.ts # BullMQ env (extends common + REDIS_URL, TRIVY_SERVER_URL, SCAN_INTERVAL_MS)
     queue.ts      # BullMQ queue + Redis connection
     worker.ts     # Sandboxed worker factory
-    services/     # Scanner, persistence, scheduler services
-    types/        # job-payload, scan-result
-    utils/        # json-stream (Trivy output parser)
+    services/
+      scheduler.service.ts  # Registers all repeatable tasks
+    types/
+      job-payload.ts        # Shared BullMQ job types
+      task.types.ts         # TaskConfig interface — contract new tasks must satisfy
+    tasks/
+      scanners/
+        trivy/              # Trivy-specific logic (scanner, persistence, scheduler-tick)
+          index.ts          # Exports trivyTaskConfig: TaskConfig
+          scan-image.job.ts
+          scanner.service.ts
+          persistence.service.ts
+          scheduler-tick.job.ts
+      hygiene/              # Weekly storage hygiene task (unrelated to scanning)
+        index.ts            # Exports hygieneTaskConfig: TaskConfig
+        prune-stale-vulnerabilities.job.ts
 prisma/
   schema.prisma
 ```
