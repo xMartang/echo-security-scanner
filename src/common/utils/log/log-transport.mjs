@@ -2,82 +2,48 @@
  * Pino worker-thread transport.
  *
  * Each log file receives its named level AND everything above it:
- *   - ${serviceName}.debug.{n}.log  (level >= 20 — all records)
- *   - ${serviceName}.info.{n}.log   (level >= 30 — info, warn, error, fatal)
- *   - ${serviceName}.error.{n}.log  (level >= 50 — error, fatal)
+ *   - ${serviceName}.debug.log  (level >= 20 — all records)
+ *   - ${serviceName}.info.log   (level >= 30 — info, warn, error, fatal)
+ *   - ${serviceName}.error.log  (level >= 50 — error, fatal)
  *
- * This mirrors the "lower files are supersets" convention so operators can
- * grep debug.log for the full picture or error.log for just failures.
+ * File naming: the active file has no numeric suffix.
+ * On each rotation a numeric suffix is appended to the archive:
+ *   bullmq.debug.log        ← current (always)
+ *   bullmq.debug.log.1      ← most-recent archive
+ *   bullmq.debug.log.2      ← older archive
+ *   …                       (up to maxFiles archives retained)
  *
  * Streams are lazily created on first write for each level so no empty
  * files are left behind for levels that receive no records.
- *
- * File naming: sequence number is appended after `.log`, e.g.:
- *   api.debug.log.1     ← current (first) file
- *   api.debug.log.2     ← second file (after first rotation)
- *   …                   (up to 5 retained via limit.count)
  */
 
+import { createStream } from 'rotating-file-stream';
 import pino from 'pino';
-import roll from 'pino-roll';
 import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import { Writable } from 'node:stream';
 
 const { values: LOG_LEVELS, labels: LOG_LABEL } = pino.levels;
-// LOG_LEVELS = { trace: 10, debug: 20, info: 30, warn: 40, error: 50, fatal: 60 }
-// LOG_LABEL  = { 10: 'trace', 20: 'debug', 30: 'info', 40: 'warn', 50: 'error', 60: 'fatal' }
 
 export default async function transport(opts) {
   const { dir = './logs/local', serviceName = 'app' } = opts;
 
   await mkdir(dir, { recursive: true });
 
-  const rollOpts = {
-    frequency: 'daily',
-    size: '50m',
-    // No 'extension' — the sequence number is appended directly to the base name,
-    // giving api.debug.log.1, api.debug.log.2, … instead of api.debug.1.log.
-    limit: { count: 5 },
-    mkdir: true,
-  };
-
-  // Lazy stream cache — created on first write so no empty files are produced.
+  // Lazy stream cache — created synchronously on first write per level.
   const streams = { debug: null, info: null, error: null };
-  // Writes that arrive while a stream is still being initialised.
-  const pending = { debug: [], info: [], error: [] };
-  // In-flight init promises — one per level key, prevents duplicate roll() calls.
-  const init = { debug: null, info: null, error: null };
 
-  async function getStream(levelKey) {
-    if (streams[levelKey]) return streams[levelKey];
-    if (!init[levelKey]) {
-      init[levelKey] = roll({ file: join(dir, `${serviceName}.${levelKey}.log`), ...rollOpts })
-        .then((s) => {
-          streams[levelKey] = s;
-          // Drain writes that accumulated while the file was being opened.
-          for (const chunk of pending[levelKey]) s.write(chunk);
-          pending[levelKey] = [];
-          return s;
-        });
+  function getStream(levelKey) {
+    if (!streams[levelKey]) {
+      // index === null → active file (no suffix)
+      // index > 0      → archived file (.1, .2, …)
+      streams[levelKey] = createStream(
+        (index) => index === null
+          ? `${serviceName}.${levelKey}.log`
+          : `${serviceName}.${levelKey}.log.${index}`,
+        { size: '50M', maxFiles: 5, path: dir },
+      );
     }
-    return init[levelKey];
-  }
-
-  /**
-   * Write `output` to the named stream level.
-   * Guard: only starts a new getStream() call when no init is already in flight.
-   * If init is in progress the pending array is sufficient — the then() will drain it.
-   */
-  function writeTo(levelKey, output) {
-    if (streams[levelKey]) {
-      streams[levelKey].write(output);
-    } else {
-      pending[levelKey].push(output);
-      if (!init[levelKey]) {
-        getStream(levelKey).catch(() => undefined);
-      }
-    }
+    return streams[levelKey];
   }
 
   /**
@@ -88,9 +54,9 @@ export default async function transport(opts) {
    *  error.log  ← error+      (level >= error, includes fatal)
    */
   function route(level, output) {
-    if (level >= LOG_LEVELS.debug) writeTo('debug', output);
-    if (level >= LOG_LEVELS.info)  writeTo('info',  output);
-    if (level >= LOG_LEVELS.error) writeTo('error', output);
+    if (level >= LOG_LEVELS.debug) getStream('debug').write(output);
+    if (level >= LOG_LEVELS.info)  getStream('info').write(output);
+    if (level >= LOG_LEVELS.error) getStream('error').write(output);
   }
 
   return new Writable({
@@ -105,7 +71,6 @@ export default async function transport(opts) {
         callback();
         return;
       }
-
 
       const numericLevel = obj.level;
       const formattedLog = { ...obj, level: LOG_LABEL[numericLevel] ?? String(numericLevel) };

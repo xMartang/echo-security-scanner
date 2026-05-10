@@ -68,9 +68,10 @@ services:
     image: aquasec/trivy:0.70.0
     restart: unless-stopped
     logging: *default-logging
-    # Pipe trivy output through tee so logs appear both in
-    # `docker compose logs trivy` (stdout) and in ./logs/trivy.log on the host.
-    command: "server --listen 0.0.0.0:8080 > /var/log/app/trivy.log 2>&1"
+    # Override entrypoint so the shell processes the pipe.
+    # tee writes to both stdout (docker compose logs trivy) and the host-mounted file.
+    entrypoint: ["sh", "-c"]
+    command: "trivy server --listen 0.0.0.0:8080 2>&1 | tee /var/log/app/trivy.log"
     ports:
       - "8080:8080"
     volumes:
@@ -146,7 +147,7 @@ services:
       trivy-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "--version"]
+      test: ["CMD", "node", "healthcheck.mjs"]
       interval: 30s
       timeout: 5s
       retries: 3

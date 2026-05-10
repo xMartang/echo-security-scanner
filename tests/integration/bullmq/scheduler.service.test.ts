@@ -69,12 +69,12 @@ describe('enqueueScanJobs (real Redis)', () => {
     expect(await scanQueue.getWaitingCount()).toBe(IMAGES.length);
   });
 
-  it('jobs have name "scan-image" and jobId matching scan__name__tag', async () => {
+  it('jobs have name "scan-image" and jobId matching scan__name__tag__timestamp', async () => {
     await enqueueScanJobs(scanQueue, new Date().toISOString());
     const jobs = await scanQueue.getWaiting();
     for (const job of jobs) {
       expect(job.name).toBe('scan-image');
-      expect(job.id).toMatch(/^scan__[^:]+__[^:]+$/);
+      expect(job.id).toMatch(/^scan__[^:]+__[^:]+__\d{4}-\d{2}-\d{2}/);
     }
   });
 

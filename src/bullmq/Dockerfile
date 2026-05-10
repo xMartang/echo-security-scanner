@@ -61,5 +61,6 @@ COPY --from=deps   --chown=nodeapp:nodeapp /app/node_modules ./node_modules
 COPY --from=build  --chown=nodeapp:nodeapp /app/dist         ./dist
 COPY --from=build  --chown=nodeapp:nodeapp /app/prisma       ./prisma
 COPY --chown=nodeapp:nodeapp package.json ./
+COPY --chown=nodeapp:nodeapp src/bullmq/healthcheck.mjs ./healthcheck.mjs
 
 CMD ["node", "dist/bullmq/index.js"]

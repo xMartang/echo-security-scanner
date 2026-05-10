@@ -33,7 +33,8 @@ describe('buildScanJobs', () => {
 
   it('jobId encodes imageName, imageTag, and triggeredAt (no colons â€” BullMQ v5)', () => {
     for (const job of buildScanJobs(IMAGES, TRIGGERED_AT)) {
-      const expected = `scan__${job.data.imageName}__${job.data.imageTag}__${TRIGGERED_AT}`;
+      const sanitizedAt = TRIGGERED_AT.replace(/:/g, '');
+      const expected = `scan__${job.data.imageName}__${job.data.imageTag}__${sanitizedAt}`;
       expect(job.opts.jobId).toBe(expected);
     }
   });
@@ -121,6 +122,6 @@ describe('processSchedulerTick', () => {
       Array<{ opts: { jobId: string } }>,
     ];
     expect(jobs).toHaveLength(IMAGES.length);
-    expect(jobs.every((j) => j.opts.jobId.includes(triggeredAt))).toBe(true);
+    expect(jobs.every((j) => j.opts.jobId.includes(triggeredAt.replace(/:/g, '')))).toBe(true);
   });
 });

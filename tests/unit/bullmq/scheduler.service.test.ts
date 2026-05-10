@@ -12,9 +12,10 @@ jest.unstable_mockModule('@/bullmq/queue.js', () => ({
 // Mock BullMQ Worker so no Redis connection is attempted.
 const mockWorkerClose = jest.fn<() => Promise<void>>().mockImplementation(() => Promise.resolve());
 const MockWorker = jest.fn<() => Partial<Worker>>(() => ({ close: mockWorkerClose }));
+const mockInternalQueueUpsert = jest.fn<() => Promise<unknown>>().mockResolvedValue({});
 jest.unstable_mockModule('bullmq', () => ({
   Worker: MockWorker,
-  Queue: jest.fn(),
+  Queue: jest.fn(() => ({ upsertJobScheduler: mockInternalQueueUpsert })),
 }));
 
 // Dynamic imports AFTER mocks are in place.

@@ -19,7 +19,7 @@ export function buildScanJobs(images: readonly ImageRef[], triggeredAt: string) 
     name: 'scan-image',
     data: { imageName: img.name, imageTag: img.tag },
     opts: {
-      jobId: `scan__${img.name}__${img.tag}__${triggeredAt}`,
+      jobId: `scan__${img.name}__${img.tag}__${triggeredAt.replace(/:/g, '')}`,
       attempts: 3,
       backoff: { type: 'exponential' as const, delay: 5_000 },
       // Keep last 100 completed jobs visible in BullMQ Board / Redis history.

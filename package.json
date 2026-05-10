@@ -27,7 +27,7 @@
     "ioredis": "^5.0.0",
     "pino": "^9.0.0",
     "pino-abstract-transport": "^2.0.0",
-    "pino-roll": "^1.0.0",
+    "rotating-file-stream": "^3.0.0",
     "stream-json": "^1.8.0",
     "zod": "^3.23.0"
   },
