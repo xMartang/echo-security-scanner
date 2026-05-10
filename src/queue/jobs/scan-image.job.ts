@@ -50,31 +50,48 @@ export async function processScanJob(
 ): Promise<ScanImageJobResult> {
   const db = prismaClient ?? getSharedPrisma();
   const repo = createImageRepository(db);
+  const imageRef = `${imageName}:${imageTag}`;
 
   // 1. Mark image SCANNING so operators see it in progress.
   const image = await repo.upsertImage(imageName, imageTag);
   await repo.markScanning(image.id);
-  logger.info({ image: `${imageName}:${imageTag}` }, 'scan started');
+  logger.info({ image: imageRef }, 'scan started');
 
   try {
     // 2. Invoke Trivy via execa; stream output through json-stream pipeline.
     const { result, stderr } = await scan(imageName, imageTag);
-    if (stderr) logger.debug({ stderr }, 'trivy stderr');
+    if (stderr) logger.debug({ image: imageRef, stderr }, 'trivy stderr output');
 
     // 3. Persist results — wrap with retryOnDBError for transient Postgres errors.
     await retryOnDBError(
       () => persistScanResults(imageName, imageTag, result, db),
     );
 
+    // 4. Build a severity breakdown for the completion log so operators can
+    //    see scan results without querying the DB.
+    const cveSummary: Record<string, number> = {};
+    for (const { severity } of result.vulnerabilities) {
+      cveSummary[severity] = (cveSummary[severity] ?? 0) + 1;
+    }
+
     logger.info(
-      { image: `${imageName}:${imageTag}`, cveCount: result.vulnerabilities.length },
+      {
+        image: imageRef,
+        total: result.vulnerabilities.length,
+        cveSummary,
+      },
       'scan completed',
     );
     return { cveCount: result.vulnerabilities.length };
   } catch (err) {
-    // 4. Never throw out of the processor — update DB and swallow.
+    // 5. Never throw out of the processor — log, update DB, and return.
+    //
+    // Pino's `err` serializer captures type, message, and full stack trace
+    // (including the "Caused by:" chain from ScanFailedError). This is the
+    // primary visibility mechanism since the bullmq sandbox is isolated from
+    // both the API process and the parent worker process.
     const errorMessage = err instanceof Error ? err.message : String(err);
-    logger.error({ err, image: `${imageName}:${imageTag}` }, 'scan failed');
+    logger.error({ err, image: imageRef }, 'scan failed');
     await repo.markFailed(image.id, errorMessage);
     return { cveCount: 0 };
   }
