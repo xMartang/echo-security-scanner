@@ -19,7 +19,7 @@ export function calculateConcurrency(imageCount: number, availableParallelism: n
 // Resolve the compiled processor file path.
 // In production (node dist/bullmq.js) this points to the compiled ESM output.
 const processorPath = fileURLToPath(
-  new URL('./tasks/scanners/trivy/scan-image.job.js', import.meta.url),
+  new URL('./scan-image.job.js', import.meta.url),
 );
 
 /**

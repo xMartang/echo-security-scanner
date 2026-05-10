@@ -11,7 +11,7 @@ import { createLogger } from '@/common/utils/log/logger.js';
 import { prisma } from '@/common/db/client.js';
 import { imageRepository } from '@/common/db/repositories/image.repository.js';
 import { connection, scanQueue, schedulerQueue } from '@/bullmq/queue.js';
-import { createScanWorker } from '@/bullmq/worker.js';
+import { createScanWorker } from '@/bullmq/tasks/scanners/trivy/worker.js';
 import { setupScheduler } from '@/bullmq/services/scheduler.service.js';
 
 const logger = createLogger({
