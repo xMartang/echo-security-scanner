@@ -74,6 +74,12 @@ model ImageVulnerability {
   packageId        Int
   installedVersion String
   fixedVersion     String?
+  /// Timestamp of the first scan that detected this CVE in this image. Immutable.
+  firstSeenAt      DateTime @default(now())
+  /// Updated to the scan timestamp every time this CVE is confirmed by the latest scan.
+  /// CVEs not updated in the latest scan are excluded from API responses via filter:
+  ///   lastSeenAt >= Image.lastScannedAt
+  lastSeenAt       DateTime @default(now())
   image            Image   @relation(fields: [imageId], references: [id], onDelete: Cascade)
   cve              Cve     @relation(fields: [cveId], references: [id], onDelete: Cascade)
   package          Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
@@ -81,4 +87,5 @@ model ImageVulnerability {
   @@id([imageId, cveId, packageId])
   @@index([cveId])
   @@index([packageId])
+  @@index([lastSeenAt])
 }
