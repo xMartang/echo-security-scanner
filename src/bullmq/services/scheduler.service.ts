@@ -33,7 +33,7 @@ export async function setupScheduler(
     },
     {
       name: 'scheduler-tick',
-      data: { triggeredAt: new Date().toISOString() },
+      data: {},
     },
   );
 

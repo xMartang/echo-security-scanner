@@ -110,17 +110,27 @@ describe('processSchedulerTick', () => {
     mockGetJobsSingleton.mockResolvedValue([]);
   });
 
-  it('enqueues jobs using the job triggeredAt timestamp', async () => {
-    const triggeredAt = '2026-05-10T12:00:00.000Z';
-    const fakeJob = { data: { triggeredAt } } as Job<SchedulerTickJobData>;
+  it('enqueues jobs using the wall-clock time of invocation (not template data)', async () => {
+    const before = Date.now();
+    const fakeJob = { data: {} } as Job<SchedulerTickJobData>;
 
     await processSchedulerTick(fakeJob);
 
+    const after = Date.now();
     expect(mockAddBulkSingleton).toHaveBeenCalledTimes(1);
     const [jobs] = (mockAddBulkSingleton.mock.calls[0] as unknown) as [
       Array<{ opts: { jobId: string } }>,
     ];
     expect(jobs).toHaveLength(IMAGES.length);
-    expect(jobs.every((j) => j.opts.jobId.includes(triggeredAt.replace(/:/g, '')))).toBe(true);
+    // jobId encodes the invocation timestamp -- each call produces unique IDs
+    // so BullMQ does not deduplicate against completed jobs from previous ticks.
+    const firstJobId = jobs[0].opts.jobId ?? '';
+    // Extract the timestamp suffix from the jobId (scan__name__tag__<ts>)
+    const tsSuffix = firstJobId.split('__').at(-1) ?? '';
+    const tsMs = new Date(
+      tsSuffix.replace(/(\d{4}-\d{2}-\d{2}T\d{2})(\d{2})(\d{2})/, '$1:$2:$3'),
+    ).getTime();
+    expect(tsMs).toBeGreaterThanOrEqual(before);
+    expect(tsMs).toBeLessThanOrEqual(after + 1000);
   });
 });

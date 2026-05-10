@@ -79,8 +79,12 @@ export async function enqueueScanJobs(
  * In-process tick processor consumed by BullMQ Worker.
  * Uses the singleton scanQueue -- not sandboxed because it only enqueues, no Trivy work.
  */
-export async function processSchedulerTick(job: Job<SchedulerTickJobData>): Promise<void> {
-  const triggeredAt = job.data.triggeredAt ?? new Date().toISOString();
+export async function processSchedulerTick(_job: Job<SchedulerTickJobData>): Promise<void> {
+  // Always use the wall-clock time of THIS invocation, not the template data.
+  // The scheduler template stores a static triggeredAt (set once at startup);
+  // reusing it would give every tick the same jobIds and BullMQ would
+  // deduplicate against completed jobs, preventing the second batch from running.
+  const triggeredAt = new Date().toISOString();
   const { enqueued, skipped, skippedImages } = await enqueueScanJobs(scanQueue, triggeredAt);
 
   if (skipped > 0) {
