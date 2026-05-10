@@ -34,7 +34,7 @@ export default async function transport(opts) {
     frequency: 'daily',
     size: '50m',
     extension: '.log',
-    limit: { count: 7 },
+    limit: { count: 5 },
     mkdir: true,
   };
 
