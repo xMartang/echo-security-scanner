@@ -2,7 +2,7 @@ import { Worker } from 'bullmq';
 import type { Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
 import { env } from '@/config/env.js';
-import { enqueueScanJobs, processSchedulerTick } from '@/queue/jobs/scheduler-tick.job.js';
+import { processSchedulerTick } from '@/queue/jobs/scheduler-tick.job.js';
 import type { SchedulerTickJobData } from '@/types/job-payload.js';
 
 /**
@@ -24,7 +24,10 @@ export async function setupScheduler(
   // Idempotent — safe to call on every restart.
   await schedulerQueue.upsertJobScheduler(
     'scan-all-images',
-    { every: env.SCAN_INTERVAL_MS },
+    { 
+      every: env.SCAN_INTERVAL_MS,
+      immediately: true // Immediate fan-out — first scan starts on boot, not after first interval.
+    },
     {
       name: 'scheduler-tick',
       data: { triggeredAt: new Date().toISOString() },
@@ -36,9 +39,6 @@ export async function setupScheduler(
     processSchedulerTick,
     { connection, concurrency: 1 },
   );
-
-  // Immediate fan-out — first scan starts on boot, not after first interval.
-  await enqueueScanJobs(inboundScanQueue, new Date().toISOString());
 
   return tickWorker;
 }

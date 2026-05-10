@@ -16,7 +16,7 @@ export function buildScanJobs(_triggeredAt?: string) {
     name: 'scan-image',
     data: { imageName: img.name, imageTag: img.tag },
     opts: {
-      jobId: `scan__${img.name}__${img.tag}`,
+      jobId: `scan__${img.name}__${img.tag}__${_triggeredAt}`,
       attempts: 3,
       backoff: { type: 'exponential' as const, delay: 5_000 },
       removeOnComplete: { count: 100 },
