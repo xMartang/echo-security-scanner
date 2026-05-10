@@ -20,7 +20,7 @@ services:
       POSTGRES_PASSWORD: scanner
       POSTGRES_DB: scanner
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./logs/postgres:/var/log/app
@@ -48,7 +48,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
       - ./logs/redis:/var/log/app
@@ -73,7 +73,7 @@ services:
     entrypoint: ["sh", "-c"]
     command: ["trivy server --listen 0.0.0.0:8080 2>&1 | tee /var/log/app/trivy.log"]
     ports:
-      - "8080:8080"
+      - "${TRIVY_PORT}:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - trivy_cache:/root/.cache/
@@ -103,7 +103,7 @@ services:
       SERVICE_NAME: api
       LOG_DIR: /var/log/app
     ports:
-      - "3000:3000"
+      - "${API_PORT}:${PORT}"
     volumes:
       - ./logs/api:/var/log/app
     depends_on:
