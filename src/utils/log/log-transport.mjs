@@ -22,8 +22,9 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
 
-const { values: LOG_LEVELS } = pino.levels;
+const { values: LOG_LEVELS, labels: LOG_LABEL } = pino.levels;
 // LOG_LEVELS = { trace: 10, debug: 20, info: 30, warn: 40, error: 50, fatal: 60 }
+// LOG_LABEL  = { 10: 'trace', 20: 'debug', 30: 'info', 40: 'warn', 50: 'error', 60: 'fatal' }
 
 export default async function transport(opts) {
   const { dir = './logs/local', serviceName = 'app' } = opts;
@@ -103,7 +104,8 @@ export default async function transport(opts) {
       }
 
 
-      const formattedLog = { ...obj, level: LOG_LABEL[obj.level] ?? String(obj.level) };
+      const numericLevel = obj.level;
+      const formattedLog = { ...obj, level: LOG_LABEL[numericLevel] ?? String(numericLevel) };
       route(numericLevel, JSON.stringify(formattedLog) + '\n');
 
       callback();

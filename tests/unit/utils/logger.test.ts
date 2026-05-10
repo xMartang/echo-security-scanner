@@ -61,7 +61,7 @@ describe('createLogger', () => {
     logger.debug({ x: 1 }, 'hello debug');
     const content = await readLevelFile(dir, 'test', 'debug');
     expect(content).toContain('hello debug');
-    expect(JSON.parse(content.trim())).toMatchObject({ level: 20, msg: 'hello debug' });
+    expect(JSON.parse(content.trim())).toMatchObject({ level: 'debug', msg: 'hello debug' });
     // debug is below info threshold — must NOT appear in info.log or error.log
     // Wait briefly for any stray writes then re-read
     await new Promise((r) => setTimeout(r, 300));
@@ -79,7 +79,7 @@ describe('createLogger', () => {
     ]);
     expect(infoContent).toContain('hello info');
     expect(debugContent).toContain('hello info');
-    expect(JSON.parse(infoContent.trim())).toMatchObject({ level: 30, msg: 'hello info' });
+    expect(JSON.parse(infoContent.trim())).toMatchObject({ level: 'info', msg: 'hello info' });
   });
 
   it('warn records go to debug.log AND info.log', async () => {
@@ -91,7 +91,7 @@ describe('createLogger', () => {
     ]);
     expect(infoContent).toContain('hello warn');
     expect(debugContent).toContain('hello warn');
-    expect(JSON.parse(infoContent.trim())).toMatchObject({ level: 40, msg: 'hello warn' });
+    expect(JSON.parse(infoContent.trim())).toMatchObject({ level: 'warn', msg: 'hello warn' });
   });
 
   it('error records go to ALL THREE files (debug, info, error)', async () => {
@@ -105,7 +105,7 @@ describe('createLogger', () => {
     expect(errorContent).toContain('hello error');
     expect(infoContent).toContain('hello error');
     expect(debugContent).toContain('hello error');
-    expect(JSON.parse(errorContent.trim())).toMatchObject({ level: 50, msg: 'hello error' });
+    expect(JSON.parse(errorContent.trim())).toMatchObject({ level: 'error', msg: 'hello error' });
   });
 
   it('pino filters out debug-level records when logger level is info', async () => {

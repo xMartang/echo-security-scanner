@@ -56,6 +56,7 @@ afterAll(async () => {
 
 afterEach(async () => {
   if (!testDb) return;
+  await testDb.scanHistory.deleteMany();
   await testDb.imageVulnerability.deleteMany();
   await testDb.imagePackage.deleteMany();
   await testDb.image.deleteMany();

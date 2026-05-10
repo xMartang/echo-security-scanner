@@ -4,23 +4,26 @@ import { IMAGES } from '@/config/images.js';
 import { scanQueue } from '@/queue/queue.js';
 
 /**
- * Builds the list of scan jobs for a given tick timestamp.
+ * Builds the list of scan jobs for a given tick.
  * Pure function — exported so tests can verify job structure without touching Redis.
+ *
+ * jobId is STABLE (no timestamp) so BullMQ deduplicates concurrent ticks:
+ *   - While a job is WAITING or ACTIVE, a second tick for the same image is a no-op.
+ *   - removeOnComplete: { count: 0 } purges the job from Redis immediately on success,
+ *     freeing the stable ID so the next tick can re-enqueue it cleanly.
+ *
+ * BullMQ v5 forbids ':' in custom jobIds — '__' used as separator.
  */
 export function buildScanJobs(_triggeredAt?: string) {
-  // jobId is stable per image (no timestamp) so BullMQ deduplicates concurrent ticks:
-  // if a scan is already WAITING/ACTIVE, a second tick for the same image is a no-op.
-  // After completion (removeOnComplete) the slot is free for the next tick.
-  // BullMQ v5 forbids ':' in custom jobIds, so we use '__' as separator.
   return IMAGES.map((img) => ({
     name: 'scan-image',
     data: { imageName: img.name, imageTag: img.tag },
     opts: {
-      jobId: `scan__${img.name}__${img.tag}__${_triggeredAt}`,
+      jobId: `scan__${img.name}__${img.tag}`,
       attempts: 3,
       backoff: { type: 'exponential' as const, delay: 5_000 },
-      removeOnComplete: { count: 100 },
-      removeOnFail: { count: 500 },
+      removeOnComplete: { count: 0 },  // Purge immediately — stable ID re-enqueues cleanly
+      removeOnFail: { count: 50 },     // Keep last 50 failures for debug visibility
     },
   }));
 }

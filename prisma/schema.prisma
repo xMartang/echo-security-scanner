@@ -67,6 +67,25 @@ model ImagePackage {
   @@id([imageId, packageId])
 }
 
+/**
+ * Audit log for every scan attempt. Capped at 1000 rows (oldest pruned on insert).
+ * Exists independently of the Image/CVE tables — never cascades.
+ */
+model ScanHistory {
+  id           Int        @id @default(autoincrement())
+  imageName    String
+  imageTag     String
+  status       ScanStatus
+  cveCount     Int?
+  cveSummary   Json?      // { CRITICAL: 3, HIGH: 8, … }
+  errorMessage String?
+  startedAt    DateTime
+  completedAt  DateTime?
+
+  @@index([imageName, imageTag])
+  @@index([startedAt])
+}
+
 model ImageVulnerability {
   imageId          Int
   cveId            Int
