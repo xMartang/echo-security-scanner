@@ -32,6 +32,12 @@ export async function persistScanResults(
   result: ScanResult,
   db: PrismaClient = prisma,
 ): Promise<void> {
+  // Captured once so lastSeenAt (step 5) and lastScannedAt (step 6) are identical.
+  // This makes the staleness filter (lastSeenAt >= lastScannedAt) exact: CVEs confirmed
+  // by this scan have lastSeenAt === lastScannedAt; unconfirmed CVEs have an older
+  // lastSeenAt and are automatically excluded from API responses.
+  const scanCompletedAt = new Date();
+
   // Sort before entering the transaction for deterministic lock ordering.
   const sortedPackages = [...result.packages].sort((a, b) =>
     a.name.localeCompare(b.name),
@@ -115,20 +121,27 @@ export async function persistScanResults(
           packageId: packageDbId,
           installedVersion: vulnerability.installedVersion,
           fixedVersion: vulnerability.fixedVersion,
+          firstSeenAt: scanCompletedAt,
+          lastSeenAt: scanCompletedAt,
         },
         update: {
           installedVersion: vulnerability.installedVersion,
           fixedVersion: vulnerability.fixedVersion,
+          // lastSeenAt always updated when CVE is confirmed by this scan.
+          // firstSeenAt is intentionally NOT updated — it records the original detection time.
+          lastSeenAt: scanCompletedAt,
         },
       });
     }
 
-    // 6. Mark Image SUCCESS â€” same transaction, so atomically committed with all upserts.
+    // 6. Mark Image SUCCESS — same transaction, so atomically committed with all upserts.
+    // lastScannedAt = scanCompletedAt so it exactly matches lastSeenAt set above,
+    // making the staleness filter (lastSeenAt >= lastScannedAt) precise.
     await trx.image.update({
       where: { id: image.id },
       data: {
         status: ScanStatus.SUCCESS,
-        lastScannedAt: new Date(),
+        lastScannedAt: scanCompletedAt,
         lastError: null,
       },
     });
