@@ -1,4 +1,16 @@
-﻿import type { PrismaClient } from '@prisma/client';
+﻿// KNOWN LIMITATION (multi-scanner scheduling): lastSeenAt filtering works correctly
+// with multiple scanners — any scanner confirming a CVE updates lastSeenAt, keeping
+// it visible. A CVE is only stale when NO scanner has confirmed it since the last
+// scan cycle, which is the correct behaviour regardless of scanner count.
+//
+// The one gap: if scanners run on different schedules (e.g. Trivy every 15 min,
+// Grype every hour), Image.lastScannedAt becomes ambiguous as a staleness threshold.
+// If this becomes a requirement, consider adding a ScanRun table:
+//   (imageId, scannerName, startedAt, completedAt, status)
+// and filtering per: lastSeenAt >= MAX(ScanRun.completedAt) across all scanners
+// for that image, so each scanner's cadence is accounted for independently.
+
+import type { PrismaClient } from '@prisma/client';
 import { ScanStatus } from '@prisma/client';
 import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
 import { prisma } from '@/common/db/client.js';
