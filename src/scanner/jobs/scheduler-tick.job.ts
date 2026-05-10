@@ -1,39 +1,59 @@
 import type { Job, Queue } from 'bullmq';
-import type { SchedulerTickJobData } from '@/scanner/types/job-payload.js';
-import { IMAGES } from '@/scanner/config/images.js';
+import type { SchedulerTickJobData, ScanImageJobData } from '@/scanner/types/job-payload.js';
+import { IMAGES, type ImageRef } from '@/scanner/config/images.js';
 import { scanQueue } from '@/scanner/queue.js';
 
 /**
- * Builds the list of scan jobs for a given tick.
+ * Builds the list of scan jobs for a given set of images and tick timestamp.
  * Pure function — exported so tests can verify job structure without touching Redis.
  *
- * jobId is STABLE (no timestamp) so BullMQ deduplicates concurrent ticks:
- *   - While a job is WAITING or ACTIVE, a second tick for the same image is a no-op.
- *   - removeOnComplete: { count: 0 } purges the job from Redis immediately on success,
- *     freeing the stable ID so the next tick can re-enqueue it cleanly.
+ * jobId includes the tick timestamp so each tick produces unique IDs, enabling
+ * BullMQ native job history (removeOnComplete: { count: N }) to work correctly.
+ * Deduplication of concurrent scans is handled by enqueueScanJobs() via queue
+ * state inspection rather than ID uniqueness.
  *
  * BullMQ v5 forbids ':' in custom jobIds — '__' used as separator.
  */
-export function buildScanJobs(_triggeredAt?: string) {
-  return IMAGES.map((img) => ({
+export function buildScanJobs(images: readonly ImageRef[], triggeredAt: string) {
+  return images.map((img) => ({
     name: 'scan-image',
     data: { imageName: img.name, imageTag: img.tag },
     opts: {
-      jobId: `scan__${img.name}__${img.tag}`,
+      jobId: `scan__${img.name}__${img.tag}__${triggeredAt}`,
       attempts: 3,
       backoff: { type: 'exponential' as const, delay: 5_000 },
-      removeOnComplete: { count: 0 },  // Purge immediately — stable ID re-enqueues cleanly
-      removeOnFail: { count: 50 },     // Keep last 50 failures for debug visibility
+      // Keep last 100 completed jobs visible in BullMQ Board / Redis history.
+      removeOnComplete: { count: 100 },
+      removeOnFail: { count: 50 },
     },
   }));
 }
 
 /**
- * Enqueues scan jobs into the provided queue. Accepts the queue as a parameter
- * so the scheduler service and tests can inject a custom queue instance.
+ * Enqueues scan jobs for images not already waiting or actively scanning.
+ *
+ * Dedup strategy: inspect queue state before adding. getJobs(['waiting','active'])
+ * returns at most IMAGES.length items — negligible cost. Single-process worker means
+ * no cross-process race condition.
  */
 export async function enqueueScanJobs(queue: Queue, triggeredAt: string): Promise<void> {
-  await queue.addBulk(buildScanJobs(triggeredAt));
+  const inFlight = await queue.getJobs(['waiting', 'active']);
+  const inFlightKeys = new Set(
+    inFlight
+      .filter((j) => j.name === 'scan-image')
+      .map((j) => {
+        const d = j.data as ScanImageJobData;
+        return `${d.imageName}:${d.imageTag}`;
+      }),
+  );
+
+  const imagesToScan = IMAGES.filter(
+    (img) => !inFlightKeys.has(`${img.name}:${img.tag}`),
+  );
+
+  if (imagesToScan.length === 0) return;
+
+  await queue.addBulk(buildScanJobs(imagesToScan, triggeredAt));
 }
 
 /**

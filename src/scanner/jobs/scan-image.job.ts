@@ -11,12 +11,11 @@
 
 import 'dotenv/config';
 import type { SandboxedJob } from 'bullmq';
-import { PrismaClient, ScanStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import type { ScanImageJobData, ScanImageJobResult } from '@/scanner/types/job-payload.js';
 import { env } from '@/scanner/config/env.js';
 import { createLogger } from '@/common/utils/log/logger.js';
 import { createImageRepository } from '@/common/db/repositories/image.repository.js';
-import { createScanHistoryRepository } from '@/common/db/repositories/scan-history.repository.js';
 import { persistScanResults } from '@/scanner/services/persistence.service.js';
 import { scan } from '@/scanner/services/scanner.service.js';
 import { retryOnDBError } from '@/common/utils/db/retry.js';
@@ -51,9 +50,7 @@ export async function processScanJob(
 ): Promise<ScanImageJobResult> {
   const db = prismaClient ?? getSharedPrisma();
   const repo = createImageRepository(db);
-  const historyRepo = createScanHistoryRepository(db);
   const imageRef = `${imageName}:${imageTag}`;
-  const startedAt = new Date();
 
   // 1. Mark image SCANNING so operators see it in progress.
   const image = await repo.upsertImage(imageName, imageTag);
@@ -70,22 +67,11 @@ export async function processScanJob(
       () => persistScanResults(imageName, imageTag, result, db),
     );
 
-    // 4. Build severity breakdown for logging and history.
+    // 4. Build severity breakdown for logging.
     const cveSummary: Record<string, number> = {};
     for (const { severity } of result.vulnerabilities) {
       cveSummary[severity] = (cveSummary[severity] ?? 0) + 1;
     }
-
-    // 5. Write to ScanHistory (best-effort — don't let a history failure abort the scan).
-    await historyRepo.save({
-      imageName,
-      imageTag,
-      status: ScanStatus.SUCCESS,
-      cveCount: result.vulnerabilities.length,
-      cveSummary,
-      startedAt,
-      completedAt: new Date(),
-    }).catch((err) => logger.warn({ err, image: imageRef }, 'failed to save scan history'));
 
     logger.info(
       { image: imageRef, total: result.vulnerabilities.length, cveSummary },
@@ -93,7 +79,7 @@ export async function processScanJob(
     );
     return { cveCount: result.vulnerabilities.length };
   } catch (err) {
-    // 6. Never throw out of the processor — log, record history, update DB status, return.
+    // 5. Never throw out of the processor — log, update DB status, return.
     //
     // Pino's `err` serializer captures type, message, and full stack trace
     // (including the "Caused by:" chain from ScanFailedError). This is the
@@ -101,16 +87,6 @@ export async function processScanJob(
     // both the API process and the parent worker process.
     const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error({ err, image: imageRef }, 'scan failed');
-
-    await historyRepo.save({
-      imageName,
-      imageTag,
-      status: ScanStatus.FAILED,
-      errorMessage,
-      startedAt,
-      completedAt: new Date(),
-    }).catch((histErr) => logger.warn({ err: histErr, image: imageRef }, 'failed to save scan history'));
-
     await repo.markFailed(image.id, errorMessage);
     return { cveCount: 0 };
   }
