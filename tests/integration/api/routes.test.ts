@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import pino from 'pino';
 import { createApp } from '@/api/app.js';
-import { persistScanResults } from '@/bullmq/tasks/scanners/trivy/persistence.service.js';
+import { ingestScanResults } from '@/bullmq/tasks/scanners/trivy/scan-ingestion.service.js';
 import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
 
 jest.setTimeout(180_000);
@@ -54,8 +54,8 @@ beforeAll(async () => {
   testDb = new PrismaClient({ datasources: { db: { url: dbUrl } } });
   await testDb.$connect();
 
-  await persistScanResults('nginx', '1.19', NGINX_SCAN, testDb);
-  await persistScanResults('redis', '6.0', REDIS_SCAN, testDb);
+  await ingestScanResults('nginx', '1.19', NGINX_SCAN, testDb);
+  await ingestScanResults('redis', '6.0', REDIS_SCAN, testDb);
 
   app = createApp({ logger: silentLogger, db: testDb });
 }, 180_000);

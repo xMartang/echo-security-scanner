@@ -2,7 +2,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'bullmq';
 import type { ConnectionOptions } from 'bullmq';
-import { IMAGES } from '@/bullmq/tasks/scanners/trivy/images.js';
+import { IMAGES } from '@/bullmq/tasks/scanners/images.js';
 
 /**
  * Sandboxed concurrency cap:

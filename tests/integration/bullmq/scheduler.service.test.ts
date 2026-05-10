@@ -12,7 +12,7 @@ import type { StartedTestContainer } from 'testcontainers';
 import { GenericContainer } from 'testcontainers';
 import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
-import { IMAGES } from '@/bullmq/tasks/scanners/trivy/images.js';
+import { IMAGES } from '@/bullmq/tasks/scanners/images.js';
 
 jest.setTimeout(120_000);
 

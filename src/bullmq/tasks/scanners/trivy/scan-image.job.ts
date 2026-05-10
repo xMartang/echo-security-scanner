@@ -16,11 +16,11 @@ import type { ScanImageJobData, ScanImageJobResult } from '@/bullmq/types/job-pa
 import { env } from '@/bullmq/config/env.js';
 import { createLogger } from '@/common/utils/log/logger.js';
 import { createImageRepository } from '@/common/db/repositories/image.repository.js';
-import { persistScanResults } from '@/bullmq/tasks/scanners/trivy/persistence.service.js';
+import { ingestScanResults } from '@/bullmq/tasks/scanners/trivy/scan-ingestion.service.js';
 import { scan } from '@/bullmq/tasks/scanners/trivy/scanner.service.js';
 import { retryOnDBError } from '@/common/utils/db/retry.js';
 
-// "-- Lazy singletons "------------------------------------------------------------------------------------------------------------------
+// -- Lazy singletons --
 
 let sharedPrisma: PrismaClient | undefined;
 function getSharedPrisma(): PrismaClient {
@@ -31,13 +31,16 @@ function getSharedPrisma(): PrismaClient {
   return sharedPrisma;
 }
 
+// Sandboxed processors run in child processes separate from the main bullmq
+// process. Using SERVICE_NAME + '-scan' routes logs to scan-processor.*.log,
+// avoiding concurrent multi-process writes to the same rotating log file.
 const logger = createLogger({
-  serviceName: env.SERVICE_NAME,
+  serviceName: `${env.SERVICE_NAME}-scan`,
   dir: env.LOG_DIR,
   level: env.LOG_LEVEL,
 });
 
-// "-- Processor "------------------------------------------------------------------------------------------------------------------------------
+// -- Processor --
 
 /**
  * Core scan logic -- exported so integration tests can call it directly without
@@ -62,9 +65,9 @@ export async function processScanJob(
     const { result, stderr } = await scan(imageName, imageTag);
     if (stderr) logger.debug({ image: imageRef, stderr }, 'trivy stderr output');
 
-    // 3. Persist CVE results -- wrap with retryOnDBError for transient Postgres errors.
+    // 3. Ingest CVE results -- wrap with retryOnDBError for transient Postgres errors.
     await retryOnDBError(
-      () => persistScanResults(imageName, imageTag, result, db),
+      () => ingestScanResults(imageName, imageTag, result, db),
     );
 
     // 4. Build severity breakdown for logging.

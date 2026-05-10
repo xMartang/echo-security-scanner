@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createImageRepository } from '@/common/db/repositories/image.repository.js';
 import { createCveRepository } from '@/common/db/repositories/cve.repository.js';
-import { persistScanResults } from '@/bullmq/tasks/scanners/trivy/persistence.service.js';
+import { ingestScanResults } from '@/bullmq/tasks/scanners/trivy/scan-ingestion.service.js';
 import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
 
 jest.setTimeout(180_000);
@@ -59,8 +59,8 @@ beforeAll(async () => {
   cveRepo = createCveRepository(testDb);
 
   // Seed once for all tests in this file
-  await persistScanResults('nginx', '1.19', NGINX_SCAN, testDb);
-  await persistScanResults('redis', '6.0', REDIS_SCAN, testDb);
+  await ingestScanResults('nginx', '1.19', NGINX_SCAN, testDb);
+  await ingestScanResults('redis', '6.0', REDIS_SCAN, testDb);
 }, 180_000);
 
 afterAll(async () => {

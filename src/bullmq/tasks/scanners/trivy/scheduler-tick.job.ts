@@ -1,7 +1,15 @@
 import type { Job, Queue } from 'bullmq';
 import type { SchedulerTickJobData, ScanImageJobData } from '@/bullmq/types/job-payload.js';
-import { IMAGES, type ImageRef } from '@/bullmq/tasks/scanners/trivy/images.js';
+import { IMAGES, type ImageRef } from '@/bullmq/tasks/scanners/images.js';
 import { scanQueue } from '@/bullmq/tasks/scanners/trivy/queues.js';
+import { env } from '@/bullmq/config/env.js';
+import { createLogger } from '@/common/utils/log/logger.js';
+
+const logger = createLogger({
+  serviceName: env.SERVICE_NAME,
+  dir: env.LOG_DIR,
+  level: env.LOG_LEVEL,
+});
 
 /**
  * Builds the list of scan jobs for a given set of images and tick timestamp.
@@ -35,8 +43,14 @@ export function buildScanJobs(images: readonly ImageRef[], triggeredAt: string) 
  * Dedup strategy: inspect queue state before adding. getJobs(['waiting','active'])
  * returns at most IMAGES.length items -- negligible cost. Single-process worker means
  * no cross-process race condition.
+ *
+ * Returns counts so the caller can emit structured log entries without the
+ * pure-function body needing to know about the logger.
  */
-export async function enqueueScanJobs(queue: Queue, triggeredAt: string): Promise<void> {
+export async function enqueueScanJobs(
+  queue: Queue,
+  triggeredAt: string,
+): Promise<{ enqueued: number; skipped: number; skippedImages: string[] }> {
   const inFlight = await queue.getJobs(['waiting', 'active']);
   const inFlightKeys = new Set(
     inFlight
@@ -50,10 +64,15 @@ export async function enqueueScanJobs(queue: Queue, triggeredAt: string): Promis
   const imagesToScan = IMAGES.filter(
     (img) => !inFlightKeys.has(`${img.name}:${img.tag}`),
   );
+  const skippedImages = IMAGES
+    .filter((img) => inFlightKeys.has(`${img.name}:${img.tag}`))
+    .map((img) => `${img.name}:${img.tag}`);
 
-  if (imagesToScan.length === 0) return;
+  if (imagesToScan.length > 0) {
+    await queue.addBulk(buildScanJobs(imagesToScan, triggeredAt));
+  }
 
-  await queue.addBulk(buildScanJobs(imagesToScan, triggeredAt));
+  return { enqueued: imagesToScan.length, skipped: skippedImages.length, skippedImages };
 }
 
 /**
@@ -62,5 +81,18 @@ export async function enqueueScanJobs(queue: Queue, triggeredAt: string): Promis
  */
 export async function processSchedulerTick(job: Job<SchedulerTickJobData>): Promise<void> {
   const triggeredAt = job.data.triggeredAt ?? new Date().toISOString();
-  await enqueueScanJobs(scanQueue, triggeredAt);
+  const { enqueued, skipped, skippedImages } = await enqueueScanJobs(scanQueue, triggeredAt);
+
+  if (skipped > 0) {
+    logger.debug(
+      { skipped, skippedImages },
+      'scheduler tick: some images already in-flight, skipping',
+    );
+  }
+  if (enqueued > 0) {
+    logger.debug({ enqueued }, 'scheduler tick: enqueued scan jobs');
+  }
+  if (enqueued === 0 && skipped === 0) {
+    logger.debug('scheduler tick: no images to scan');
+  }
 }

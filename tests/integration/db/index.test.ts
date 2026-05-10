@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 import { createImageRepository } from '@/common/db/repositories/image.repository.js';
-import { persistScanResults } from '@/bullmq/tasks/scanners/trivy/persistence.service.js';
+import { ingestScanResults } from '@/bullmq/tasks/scanners/trivy/scan-ingestion.service.js';
 import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
 
 // 3 minutes -- container pull + start can be slow on first run.
@@ -164,11 +164,11 @@ describe('imageRepository', () => {
   });
 });
 
-// "-- persistScanResults "--------------------------------------------------------------------------------------------------------------
+// "-- ingestScanResults "--------------------------------------------------------------------------------------------------------------
 
-describe('persistScanResults', () => {
+describe('ingestScanResults', () => {
   it('creates all expected rows on first scan', async () => {
-    await persistScanResults('nginx', '1.19', SCAN_RESULT, testDb);
+    await ingestScanResults('nginx', '1.19', SCAN_RESULT, testDb);
 
     const counts = await countAll();
     expect(counts.images).toBe(1);
@@ -179,7 +179,7 @@ describe('persistScanResults', () => {
   });
 
   it('marks image as SUCCESS after persist', async () => {
-    await persistScanResults('nginx', '1.19', SCAN_RESULT, testDb);
+    await ingestScanResults('nginx', '1.19', SCAN_RESULT, testDb);
     const img = await testDb.image.findFirstOrThrow({ where: { name: 'nginx', tag: '1.19' } });
     expect(img.status).toBe(ScanStatus.SUCCESS);
     expect(img.lastScannedAt).not.toBeNull();
@@ -187,18 +187,18 @@ describe('persistScanResults', () => {
   });
 
   it('is idempotent -- second scan does not grow row counts', async () => {
-    await persistScanResults('nginx', '1.19', SCAN_RESULT, testDb);
+    await ingestScanResults('nginx', '1.19', SCAN_RESULT, testDb);
     const after1 = await countAll();
 
-    await persistScanResults('nginx', '1.19', SCAN_RESULT, testDb);
+    await ingestScanResults('nginx', '1.19', SCAN_RESULT, testDb);
     const after2 = await countAll();
 
     expect(after2).toStrictEqual(after1);
   });
 
   it('two different images share Package and Cve rows', async () => {
-    await persistScanResults('nginx', '1.19', SCAN_RESULT, testDb);
-    await persistScanResults('redis', '6.0', SCAN_RESULT, testDb);
+    await ingestScanResults('nginx', '1.19', SCAN_RESULT, testDb);
+    await ingestScanResults('redis', '6.0', SCAN_RESULT, testDb);
 
     const counts = await countAll();
     // Packages and CVEs are deduplicated across images
@@ -211,7 +211,7 @@ describe('persistScanResults', () => {
   });
 
   it('updates installedVersion on subsequent scan if changed', async () => {
-    await persistScanResults('nginx', '1.19', SCAN_RESULT, testDb);
+    await ingestScanResults('nginx', '1.19', SCAN_RESULT, testDb);
 
     const updatedResult: ScanResult = {
       ...SCAN_RESULT,
@@ -221,7 +221,7 @@ describe('persistScanResults', () => {
           : v,
       ),
     };
-    await persistScanResults('nginx', '1.19', updatedResult, testDb);
+    await ingestScanResults('nginx', '1.19', updatedResult, testDb);
 
     const iv = await testDb.imageVulnerability.findFirst({
       where: { cve: { cveId: 'CVE-2023-0001' } },

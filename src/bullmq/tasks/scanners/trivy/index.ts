@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import type { TaskConfig } from '@/bullmq/tasks/task.types.js';
-import { IMAGES } from '@/bullmq/tasks/scanners/trivy/images.js';
+import { IMAGES } from '@/bullmq/tasks/scanners/images.js';
 import { env } from '@/bullmq/config/env.js';
 
 /**

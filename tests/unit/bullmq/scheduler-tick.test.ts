@@ -13,7 +13,7 @@ jest.unstable_mockModule('@/bullmq/tasks/scanners/trivy/queues.js', () => ({
 // Dynamic imports after mock is in place
 const { buildScanJobs, enqueueScanJobs, processSchedulerTick } =
   await import('@/bullmq/tasks/scanners/trivy/scheduler-tick.job.js');
-const { IMAGES } = await import('@/bullmq/tasks/scanners/trivy/images.js');
+const { IMAGES } = await import('@/bullmq/tasks/scanners/images.js');
 
 // "-- buildScanJobs (pure function -- no mocks needed) "----------------------------------------------------
 
