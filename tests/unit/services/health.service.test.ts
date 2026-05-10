@@ -1,68 +1,80 @@
 import type { PrismaClient } from '@prisma/client';
-import type { Redis } from 'ioredis';
-import { createHealthService } from '@/services/health.service.js';
+import { createHealthService } from '@/api/services/health.service.js';
 
 function makeMockDb(healthy: boolean): PrismaClient {
   return {
     $queryRaw: healthy
       ? () => Promise.resolve([{ '?column?': 1 }])
       : () => Promise.reject(new Error('connection refused')),
+    image: {
+      findFirst: () => Promise.resolve(null),
+    },
   } as unknown as PrismaClient;
 }
 
-function makeMockRedis(healthy: boolean): Redis {
-  return {
-    ping: healthy ? () => Promise.resolve('PONG') : () => Promise.reject(new Error('ECONNREFUSED')),
-  } as unknown as Redis;
-}
-
 describe('createHealthService', () => {
-  it('reports ok when all components are healthy', async () => {
-    const service = createHealthService({
-      db: makeMockDb(true),
-      redis: makeMockRedis(true),
-      trivyUrl: 'http://never-called',  // fetch will fail but that's ok for trivy: error
-    });
-
-    // We can't mock fetch easily, so trivy will be 'error' (non-existent URL).
-    // Test what we can control.
+  it('reports ok when DB is healthy (no staleness check)', async () => {
+    const service = createHealthService({ db: makeMockDb(true) });
     const result = await service.check();
     expect(result.db).toBe('ok');
-    expect(result.redis).toBe('ok');
-    expect(result.trivy).toBe('error'); // no real trivy in tests
-    expect(result.status).toBe('degraded'); // degraded because trivy is error
+    expect(result.status).toBe('ok');
+    expect(result.scanner).toBeUndefined();
   });
 
-  it('reports db: error when DB query fails', async () => {
-    const service = createHealthService({
-      db: makeMockDb(false),
-      redis: makeMockRedis(true),
-      trivyUrl: 'http://never-called',
-    });
-
+  it('reports degraded when DB query fails', async () => {
+    const service = createHealthService({ db: makeMockDb(false) });
     const result = await service.check();
     expect(result.db).toBe('error');
-  });
-
-  it('reports redis: error when Redis ping fails', async () => {
-    const service = createHealthService({
-      db: makeMockDb(true),
-      redis: makeMockRedis(false),
-      trivyUrl: 'http://never-called',
-    });
-
-    const result = await service.check();
-    expect(result.redis).toBe('error');
-  });
-
-  it('reports status degraded when any component is unhealthy', async () => {
-    const service = createHealthService({
-      db: makeMockDb(false),
-      redis: makeMockRedis(false),
-      trivyUrl: 'http://never-called',
-    });
-
-    const result = await service.check();
     expect(result.status).toBe('degraded');
+  });
+
+  it('reports never_scanned when no images have been scanned', async () => {
+    const mockDb = {
+      $queryRaw: () => Promise.resolve([]),
+      image: { findFirst: () => Promise.resolve(null) },
+    } as unknown as PrismaClient;
+
+    const service = createHealthService({
+      db: mockDb,
+      scannerStalenessThresholdMs: 1_800_000,
+    });
+    const result = await service.check();
+    expect(result.scanner?.status).toBe('never_scanned');
+    expect(result.scanner?.lastScannedAt).toBeNull();
+  });
+
+  it('reports stale when last scan exceeds threshold', async () => {
+    const oldDate = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2 hours ago
+    const mockDb = {
+      $queryRaw: () => Promise.resolve([]),
+      image: {
+        findFirst: () => Promise.resolve({ lastScannedAt: oldDate }),
+      },
+    } as unknown as PrismaClient;
+
+    const service = createHealthService({
+      db: mockDb,
+      scannerStalenessThresholdMs: 30 * 60 * 1000, // 30 min threshold
+    });
+    const result = await service.check();
+    expect(result.scanner?.status).toBe('stale');
+    expect(result.scanner?.lastScannedAt).toBe(oldDate.toISOString());
+  });
+
+  it('reports ok when last scan is within threshold', async () => {
+    const recentDate = new Date(Date.now() - 5 * 60 * 1000); // 5 min ago
+    const mockDb = {
+      $queryRaw: () => Promise.resolve([]),
+      image: {
+        findFirst: () => Promise.resolve({ lastScannedAt: recentDate }),
+      },
+    } as unknown as PrismaClient;
+
+    const service = createHealthService({
+      db: mockDb,
+      scannerStalenessThresholdMs: 30 * 60 * 1000,
+    });
+    const result = await service.check();
+    expect(result.scanner?.status).toBe('ok');
   });
 });

@@ -26,7 +26,10 @@ export function createApp(deps: AppDeps): Express {
 
   const imageRepo = createImageRepository(db);
   const cveRepo = createCveRepository(db);
-  const healthService = createHealthService({ db });
+  const healthService = createHealthService({
+    db,
+    scannerStalenessThresholdMs: 30 * 60 * 1000, // 30 minutes
+  });
 
   const app = express();
 
