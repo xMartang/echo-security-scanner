@@ -235,22 +235,29 @@ All app logs land in `./logs/` on the host. Each level file receives that level 
 
 | File | Contents |
 |---|---|
-| `logs/api.debug.1.log` | All log records (debug+) |
-| `logs/api.info.1.log` | Info, warn, error, fatal |
-| `logs/api.error.1.log` | Error and fatal only |
-| `logs/scanner.*.log` | Same pattern for the scanner service |
+| `logs/api.debug.log.1` | All log records (debug+) — current file |
+| `logs/api.debug.log.2` | Previous rotated file (older = higher number) |
+| `logs/api.info.log.1` | Info, warn, error, fatal |
+| `logs/api.error.log.1` | Error and fatal only |
+| `logs/scanner.debug.log.1` | Same pattern for the scanner service |
 | `logs/postgres-YYYY-MM-DD.log` | Postgres server logs |
+| `logs/redis.log` | Redis server logs |
+| `logs/trivy.log` | Trivy server logs |
 
 ```bash
-# Stream info logs from the API
-tail -f logs/api.info.1.log | jq
+# Stream info logs from the API (.1 = current; .2 = previous after rotation)
+tail -f logs/api.info.log.1 | jq
 
 # Stream all records from the scanner (scan progress, retries, etc.)
-tail -f logs/scanner.debug.1.log | jq .msg
+tail -f logs/scanner.debug.log.1 | jq .msg
 
-# Redis and Trivy use Docker's json-file driver
+# Redis and Trivy logs are also in ./logs/
+tail -f logs/redis.log
+tail -f logs/trivy.log
+
+# Or via Docker if you prefer
 docker compose logs -f redis
-docker compose logs -f trivy-server
+docker compose logs -f trivy
 ```
 
 Timestamps are ISO-8601 strings (`"time":"2026-05-10T12:00:00.000Z"`).

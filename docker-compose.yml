@@ -1,8 +1,6 @@
 ---
 # ── Shared logging configuration ───────────────────────────────────────────────
-# Applied to every service via the x-logging anchor. Caps stdout log disk usage
-# and provides Docker-managed rotation for services without their own log files
-# (redis, trivy-server).
+# Applied to every service via the x-logging anchor. Caps stdout log disk usage.
 x-logging: &default-logging
   driver: json-file
   options:
@@ -13,6 +11,7 @@ services:
 
   # ── PostgreSQL ──────────────────────────────────────────────────────────────
   postgres:
+    container_name: postgres
     image: postgres:16-alpine
     restart: unless-stopped
     logging: *default-logging
@@ -44,6 +43,7 @@ services:
 
   # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
+    container_name: redis
     image: redis:7-alpine
     restart: unless-stopped
     logging: *default-logging
@@ -51,9 +51,10 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    # --logfile "" → Redis logs to stdout only (no built-in rotation support).
-    # Rotation is handled by the json-file logging driver above.
-    command: redis-server --logfile "" --loglevel notice
+      - ./logs:/var/log/app
+    # Pipe redis-server output through tee so logs appear both in
+    # `docker compose logs redis` (stdout) and in ./logs/redis.log on the host.
+    command: sh -c "redis-server --loglevel notice 2>&1 | tee /var/log/app/redis.log"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -63,19 +64,22 @@ services:
 
   # ── Trivy server ────────────────────────────────────────────────────────────
   trivy-server:
+    container_name: trivy
     image: aquasec/trivy:0.70.0
     restart: unless-stopped
     logging: *default-logging
-    command: server --listen 0.0.0.0:8080
+    # Pipe trivy output through tee so logs appear both in
+    # `docker compose logs trivy` (stdout) and in ./logs/trivy.log on the host.
+    command: sh -c "trivy server --listen 0.0.0.0:8080 2>&1 | tee /var/log/app/trivy.log"
     ports:
       - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - trivy_cache:/root/.cache/
+      - ./logs:/var/log/app
     healthcheck:
       # On first boot Trivy downloads the vulnerability DB (~several hundred MB).
-      # start_period: 5m prevents Docker from marking it unhealthy during the download
-      # and restart-looping the bullmq container.
+      # start_period: 5m prevents Docker from marking it unhealthy during the download.
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
       interval: 30s
       timeout: 10s
@@ -84,6 +88,7 @@ services:
 
   # ── API (Express) ───────────────────────────────────────────────────────────
   api:
+    container_name: api
     build:
       context: .
       dockerfile: src/api/Dockerfile
@@ -114,6 +119,7 @@ services:
 
   # ── Scanner worker ──────────────────────────────────────────────────────────
   scanner:
+    container_name: scanner
     build:
       context: .
       dockerfile: src/scanner/Dockerfile
@@ -139,8 +145,6 @@ services:
         condition: service_healthy
       trivy-server:
         condition: service_healthy
-    # Liveness: process exists and responds to node --version (not a real health
-    # check — scanner workers have no HTTP port). Docker restarts on crash.
     healthcheck:
       test: ["CMD", "node", "--version"]
       interval: 30s

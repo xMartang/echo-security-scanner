@@ -7,8 +7,9 @@ const LOG_DIR = join('./logs', 'local');
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
 /**
- * pino-roll appends a sequence number to the filename base:
- * e.g. api.debug.1.log, api.info.1.log, api.error.1.log
+ * Log file naming: current file = api.debug.log (symlink on Linux/Docker),
+ * rotated files = api.debug.log.1, api.debug.log.2, …
+ * This helper finds whichever is present (symlink or numbered fallback).
  */
 async function readLevelFile(
   dir: string,
@@ -20,16 +21,19 @@ async function readLevelFile(
   while (Date.now() - start < timeoutMs) {
     try {
       const files = await readdir(dir);
-      const match = files.find(
-        (f) => f.startsWith(`${serviceName}.${level}.`) && f.endsWith('.log'),
-      );
+      // Prefer the symlink (api.debug.log); fall back to any numbered file
+      // (api.debug.log.1, api.debug.log.2, …) on platforms where symlinks
+      // are unavailable.
+      const match =
+        files.find((f) => f === `${serviceName}.${level}.log`) ??
+        files.find((f) => f.startsWith(`${serviceName}.${level}.log.`));
       if (match) return readFile(join(dir, match), 'utf-8');
     } catch {
       // dir may not exist yet
     }
     await new Promise((r) => setTimeout(r, 100));
   }
-  throw new Error(`Timed out waiting for ${serviceName}.${level}.*.log in ${dir}`);
+  throw new Error(`Timed out waiting for ${serviceName}.${level}.log in ${dir}`);
 }
 
 describe('createLogger', () => {

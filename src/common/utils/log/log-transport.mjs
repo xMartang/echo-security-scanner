@@ -12,8 +12,10 @@
  * Streams are lazily created on first write for each level so no empty
  * files are left behind for levels that receive no records.
  *
- * pino-roll appends a sequence number to the base path; e.g.:
- *   api.debug.1.log, api.debug.2.log, … (daily + 50 MB rotation, 7 files)
+ * File naming: sequence number is appended after `.log`, e.g.:
+ *   api.debug.log.1     ← current (first) file
+ *   api.debug.log.2     ← second file (after first rotation)
+ *   …                   (up to 5 retained via limit.count)
  */
 
 import pino from 'pino';
@@ -34,7 +36,8 @@ export default async function transport(opts) {
   const rollOpts = {
     frequency: 'daily',
     size: '50m',
-    extension: '.log',
+    // No 'extension' — the sequence number is appended directly to the base name,
+    // giving api.debug.log.1, api.debug.log.2, … instead of api.debug.1.log.
     limit: { count: 5 },
     mkdir: true,
   };
@@ -49,7 +52,7 @@ export default async function transport(opts) {
   async function getStream(levelKey) {
     if (streams[levelKey]) return streams[levelKey];
     if (!init[levelKey]) {
-      init[levelKey] = roll({ file: join(dir, `${serviceName}.${levelKey}`), ...rollOpts })
+      init[levelKey] = roll({ file: join(dir, `${serviceName}.${levelKey}.log`), ...rollOpts })
         .then((s) => {
           streams[levelKey] = s;
           // Drain writes that accumulated while the file was being opened.
