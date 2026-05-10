@@ -1,8 +1,8 @@
-import os from 'node:os';
+﻿import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'bullmq';
 import type { ConnectionOptions } from 'bullmq';
-import { IMAGES } from '@/scanner/config/images.js';
+import { IMAGES } from '@/bullmq/tasks/scanners/trivy/images.js';
 
 /**
  * Sandboxed concurrency cap:
@@ -19,7 +19,7 @@ export function calculateConcurrency(imageCount: number, availableParallelism: n
 // Resolve the compiled processor file path.
 // In production (node dist/bullmq.js) this points to the compiled ESM output.
 const processorPath = fileURLToPath(
-  new URL('./jobs/scan-image.job.js', import.meta.url),
+  new URL('./tasks/scanners/trivy/scan-image.job.js', import.meta.url),
 );
 
 /**

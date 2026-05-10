@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Integration tests: repositories + persistence service against a real Postgres.
  *
  * Requires Docker to be running. Starts a postgres:16-alpine container,
@@ -13,10 +13,10 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 import { createImageRepository } from '@/common/db/repositories/image.repository.js';
-import { persistScanResults } from '@/scanner/services/persistence.service.js';
-import type { ScanResult } from '@/scanner/types/scan-result.js';
+import { persistScanResults } from '@/bullmq/tasks/scanners/trivy/persistence.service.js';
+import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
 
-// 3 minutes — container pull + start can be slow on first run.
+// 3 minutes â€” container pull + start can be slow on first run.
 jest.setTimeout(180_000);
 
 const require = createRequire(import.meta.url);
@@ -25,7 +25,7 @@ const prismaCLI: string = require.resolve('prisma/build/index.js');
 let container: StartedTestContainer;
 let testDb: PrismaClient;
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function countAll() {
   const [images, pkgs, cves, imgPkgs, imgVulns] = await Promise.all([
@@ -38,7 +38,7 @@ async function countAll() {
   return { images, pkgs, cves, imgPkgs, imgVulns };
 }
 
-// ── lifecycle ─────────────────────────────────────────────────────────────────
+// â”€â”€ lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 beforeAll(async () => {
   container = await new GenericContainer('postgres:16-alpine')
@@ -77,7 +77,7 @@ afterEach(async () => {
   await testDb.package.deleteMany();
 });
 
-// ── fixtures ──────────────────────────────────────────────────────────────────
+// â”€â”€ fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SCAN_RESULT: ScanResult = {
   packages: [{ name: 'openssl' }, { name: 'libssl' }],
@@ -99,7 +99,7 @@ const SCAN_RESULT: ScanResult = {
   ],
 };
 
-// ── imageRepository ───────────────────────────────────────────────────────────
+// â”€â”€ imageRepository â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('imageRepository', () => {
   let repo: ReturnType<typeof createImageRepository>;
@@ -137,24 +137,24 @@ describe('imageRepository', () => {
     expect(updated.lastError).toBe('trivy timeout');
   });
 
-  it('markStuckScanningAsFailed marks SCANNING → FAILED', async () => {
+  it('markStuckScanningAsFailed marks SCANNING â†’ FAILED', async () => {
     const a = await repo.upsertImage('nginx', '1.19');
     const b = await repo.upsertImage('redis', '6.0');
     await testDb.image.updateMany({
       where: { id: { in: [a.id, b.id] } },
       data: { status: ScanStatus.SCANNING },
     });
-    await repo.upsertImage('alpine', '3.12'); // PENDING — should be untouched
+    await repo.upsertImage('alpine', '3.12'); // PENDING â€” should be untouched
 
     const count = await repo.markStuckScanningAsFailed();
     expect(count).toBe(2);
 
     const rows = await testDb.image.findMany({ orderBy: { name: 'asc' } });
     const [alpine, nginx, redis] = rows;
-    expect(alpine?.status).toBe(ScanStatus.PENDING); // alpine — always PENDING
-    expect(nginx?.status).toBe(ScanStatus.FAILED);   // nginx — was SCANNING
+    expect(alpine?.status).toBe(ScanStatus.PENDING); // alpine â€” always PENDING
+    expect(nginx?.status).toBe(ScanStatus.FAILED);   // nginx â€” was SCANNING
     expect(nginx?.lastError).toBe('Container exited abruptly while scanning; marked as FAILED.');
-    expect(redis?.status).toBe(ScanStatus.FAILED);   // redis — was SCANNING
+    expect(redis?.status).toBe(ScanStatus.FAILED);   // redis â€” was SCANNING
   });
 
   it('markStuckScanningAsFailed returns 0 when nothing is stuck', async () => {
@@ -164,7 +164,7 @@ describe('imageRepository', () => {
   });
 });
 
-// ── persistScanResults ────────────────────────────────────────────────────────
+// â”€â”€ persistScanResults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('persistScanResults', () => {
   it('creates all expected rows on first scan', async () => {
@@ -186,7 +186,7 @@ describe('persistScanResults', () => {
     expect(img.lastError).toBeNull();
   });
 
-  it('is idempotent — second scan does not grow row counts', async () => {
+  it('is idempotent â€” second scan does not grow row counts', async () => {
     await persistScanResults('nginx', '1.19', SCAN_RESULT, testDb);
     const after1 = await countAll();
 

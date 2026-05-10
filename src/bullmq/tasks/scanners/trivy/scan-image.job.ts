@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Sandboxed BullMQ processor for `scan-image` jobs.
  *
  * BullMQ forks a child process per job and `import()`s this file. The child
@@ -12,15 +12,15 @@
 import 'dotenv/config';
 import type { SandboxedJob } from 'bullmq';
 import { PrismaClient } from '@prisma/client';
-import type { ScanImageJobData, ScanImageJobResult } from '@/scanner/types/job-payload.js';
-import { env } from '@/scanner/config/env.js';
+import type { ScanImageJobData, ScanImageJobResult } from '@/bullmq/types/job-payload.js';
+import { env } from '@/bullmq/config/env.js';
 import { createLogger } from '@/common/utils/log/logger.js';
 import { createImageRepository } from '@/common/db/repositories/image.repository.js';
-import { persistScanResults } from '@/scanner/services/persistence.service.js';
-import { scan } from '@/scanner/services/scanner.service.js';
+import { persistScanResults } from '@/bullmq/tasks/scanners/trivy/persistence.service.js';
+import { scan } from '@/bullmq/tasks/scanners/trivy/scanner.service.js';
 import { retryOnDBError } from '@/common/utils/db/retry.js';
 
-// ── Lazy singletons ──────────────────────────────────────────────────────────
+// â”€â”€ Lazy singletons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 let sharedPrisma: PrismaClient | undefined;
 function getSharedPrisma(): PrismaClient {
@@ -37,10 +37,10 @@ const logger = createLogger({
   level: env.LOG_LEVEL,
 });
 
-// ── Processor ────────────────────────────────────────────────────────────────
+// â”€â”€ Processor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
- * Core scan logic — exported so integration tests can call it directly without
+ * Core scan logic â€” exported so integration tests can call it directly without
  * going through the BullMQ sandbox (which requires compiled JS on disk).
  */
 export async function processScanJob(
@@ -62,7 +62,7 @@ export async function processScanJob(
     const { result, stderr } = await scan(imageName, imageTag);
     if (stderr) logger.debug({ image: imageRef, stderr }, 'trivy stderr output');
 
-    // 3. Persist CVE results — wrap with retryOnDBError for transient Postgres errors.
+    // 3. Persist CVE results â€” wrap with retryOnDBError for transient Postgres errors.
     await retryOnDBError(
       () => persistScanResults(imageName, imageTag, result, db),
     );
@@ -79,7 +79,7 @@ export async function processScanJob(
     );
     return { cveCount: result.vulnerabilities.length };
   } catch (err) {
-    // 5. Never throw out of the processor — log, update DB status, return.
+    // 5. Never throw out of the processor â€” log, update DB status, return.
     //
     // Pino's `err` serializer captures type, message, and full stack trace
     // (including the "Caused by:" chain from ScanFailedError). This is the

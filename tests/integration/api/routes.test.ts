@@ -1,7 +1,7 @@
-/**
+﻿/**
  * Integration tests for /health, /api/images, and /api/cves routes.
  * Uses testcontainers Postgres with real migrations + seeded data.
- * Redis and Trivy are mocked — no extra containers needed.
+ * Redis and Trivy are mocked â€” no extra containers needed.
  */
 
 import { jest } from '@jest/globals';
@@ -13,8 +13,8 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import pino from 'pino';
 import { createApp } from '@/api/app.js';
-import { persistScanResults } from '@/scanner/services/persistence.service.js';
-import type { ScanResult } from '@/scanner/types/scan-result.js';
+import { persistScanResults } from '@/bullmq/tasks/scanners/trivy/persistence.service.js';
+import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
 
 jest.setTimeout(180_000);
 
@@ -65,10 +65,10 @@ afterAll(async () => {
   await container?.stop();
 });
 
-// Typed helper — supertest body is `any` but we want type safety in assertions.
+// Typed helper â€” supertest body is `any` but we want type safety in assertions.
 type ApiData<T> = { data: T };
 
-// ── /health ───────────────────────────────────────────────────────────────────
+// â”€â”€ /health â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('GET /health', () => {
   it('returns { data: { db, status } }', async () => {
@@ -86,7 +86,7 @@ describe('GET /health', () => {
   });
 });
 
-// ── /api/images ───────────────────────────────────────────────────────────────
+// â”€â”€ /api/images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('GET /api/images', () => {
   it('returns all scanned images wrapped in { data }', async () => {
@@ -104,7 +104,7 @@ describe('GET /api/images', () => {
   });
 });
 
-// ── /api/images/:name/:tag/cves ───────────────────────────────────────────────
+// â”€â”€ /api/images/:name/:tag/cves â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('GET /api/images/:name/:tag/cves', () => {
   it('returns CVEs for a known image', async () => {
@@ -135,7 +135,7 @@ describe('GET /api/images/:name/:tag/cves', () => {
   });
 });
 
-// ── /api/cves ─────────────────────────────────────────────────────────────────
+// â”€â”€ /api/cves â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('GET /api/cves', () => {
   it('returns all distinct CVEs', async () => {
@@ -159,7 +159,7 @@ describe('GET /api/cves', () => {
   });
 });
 
-// ── /api/cves/:cveId/images ───────────────────────────────────────────────────
+// â”€â”€ /api/cves/:cveId/images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('GET /api/cves/:cveId/images', () => {
   it('returns all images affected by a CVE', async () => {

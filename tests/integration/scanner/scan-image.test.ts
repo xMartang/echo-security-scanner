@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Integration tests for the scan-image processor.
  *
  * Calls processScanJob() directly (no BullMQ sandbox) with a real Postgres
@@ -17,12 +17,12 @@ import { createRequire } from 'node:module';
 
 // Mock scanner before importing the processor
 const mockScan = jest.fn<() => Promise<{ result: object; stderr: string }>>();
-jest.unstable_mockModule('@/scanner/services/scanner.service.js', () => ({
+jest.unstable_mockModule('@/bullmq/tasks/scanners/trivy/scanner.service.js', () => ({
   scan: mockScan,
   parseScanOutputStream: jest.fn(),
 }));
 
-const { processScanJob } = await import('@/scanner/jobs/scan-image.job.js');
+const { processScanJob } = await import('@/bullmq/tasks/scanners/trivy/scan-image.job.js');
 
 const require = createRequire(import.meta.url);
 const prismaCLI: string = require.resolve('prisma/build/index.js');
@@ -64,7 +64,7 @@ afterEach(async () => {
   mockScan.mockReset();
 });
 
-// ── fixtures ─────────────────────────────────────────────────────────────────
+// â”€â”€ fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SHARED_SCAN_RESULT = {
   packages: [{ name: 'openssl' }, { name: 'libssl' }],
@@ -85,7 +85,7 @@ const SHARED_SCAN_RESULT = {
   ],
 };
 
-// ── basic processor tests ─────────────────────────────────────────────────────
+// â”€â”€ basic processor tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('processScanJob', () => {
   it('marks image SUCCESS and returns cveCount on happy path', async () => {
@@ -116,11 +116,11 @@ describe('processScanJob', () => {
   });
 });
 
-// ── concurrency stress test ───────────────────────────────────────────────────
+// â”€â”€ concurrency stress test â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('concurrency stress: two parallel scans sharing CVEs and packages', () => {
   it('produces consistent row counts regardless of execution order', async () => {
-    // Both scans use the exact same CVEs and packages — idempotency under concurrency.
+    // Both scans use the exact same CVEs and packages â€” idempotency under concurrency.
     mockScan
       .mockResolvedValueOnce({ result: SHARED_SCAN_RESULT, stderr: '' })
       .mockResolvedValueOnce({ result: SHARED_SCAN_RESULT, stderr: '' });
@@ -148,7 +148,7 @@ describe('concurrency stress: two parallel scans sharing CVEs and packages', () 
 
     // Each successful scan creates imgPkg + imgVuln rows.
     // With retries, both should eventually succeed (4 each) but we tolerate
-    // partial success (≥2 each) in case one hits a non-retriable error.
+    // partial success (â‰¥2 each) in case one hits a non-retriable error.
     expect(imgPkgCount).toBeGreaterThanOrEqual(2);
     expect(imgVulnCount).toBeGreaterThanOrEqual(2);
   });

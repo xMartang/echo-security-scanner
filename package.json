@@ -7,9 +7,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node -e \"const {cpSync}=require('fs');cpSync('src/common/utils/log/log-transport.mjs','dist/common/utils/log/log-transport.mjs')\"",
     "dev": "tsx watch src/api/index.ts",
-    "dev:worker": "tsx watch src/scanner/index.ts",
+    "dev:worker": "tsx watch src/bullmq/index.ts",
     "start": "node dist/api/index.js",
-    "start:worker": "node dist/scanner/index.js",
+    "start:worker": "node dist/bullmq/index.js",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --forceExit --runInBand",
     "lint": "eslint src tests --no-error-on-unmatched-pattern",
     "typecheck": "tsc --noEmit",

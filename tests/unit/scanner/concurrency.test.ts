@@ -1,4 +1,4 @@
-import { calculateConcurrency } from '@/scanner/worker.js';
+﻿import { calculateConcurrency } from '@/bullmq/worker.js';
 
 describe('calculateConcurrency', () => {
   it('uses half of available parallelism', () => {

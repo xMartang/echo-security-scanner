@@ -1,6 +1,6 @@
-import type { PrismaClient } from '@prisma/client';
+﻿import type { PrismaClient } from '@prisma/client';
 import { ScanStatus } from '@prisma/client';
-import type { ScanResult } from '@/scanner/types/scan-result.js';
+import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
 import { prisma } from '@/common/db/client.js';
 
 /**
@@ -30,7 +30,7 @@ export async function persistScanResults(
   });
 
   await db.$transaction(async (trx) => {
-    // 1. Upsert Image — establishes the FK anchor for all join tables.
+    // 1. Upsert Image â€” establishes the FK anchor for all join tables.
     const image = await trx.image.upsert({
       where: { name_tag: { name: imageName, tag: imageTag } },
       create: { name: imageName, tag: imageTag },
@@ -38,7 +38,7 @@ export async function persistScanResults(
     });
 
     // 2. Upsert Packages (sorted by name).
-    const packageIdByName = new Map<string, number>(); // package name → db id
+    const packageIdByName = new Map<string, number>(); // package name â†’ db id
     for (const pkg of sortedPackages) {
       const savedPackage = await trx.package.upsert({
         where: { name: pkg.name },
@@ -50,7 +50,7 @@ export async function persistScanResults(
 
     // 3. Upsert CVEs (sorted by cveId; update severity/description on each run
     //    in case Trivy revises them in a subsequent database update).
-    const cveDbIdByCveId = new Map<string, number>(); // cve string id → db row id
+    const cveDbIdByCveId = new Map<string, number>(); // cve string id â†’ db row id
     for (const vulnerability of sortedVulns) {
       if (cveDbIdByCveId.has(vulnerability.cveId)) continue; // deduplicate same CVE across packages
       const savedCve = await trx.cve.upsert({
@@ -111,7 +111,7 @@ export async function persistScanResults(
       });
     }
 
-    // 6. Mark Image SUCCESS — same transaction, so atomically committed with all upserts.
+    // 6. Mark Image SUCCESS â€” same transaction, so atomically committed with all upserts.
     await trx.image.update({
       where: { id: image.id },
       data: {

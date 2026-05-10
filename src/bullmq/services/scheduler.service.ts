@@ -1,9 +1,9 @@
-import { Worker } from 'bullmq';
+﻿import { Worker } from 'bullmq';
 import type { Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
-import { env } from '@/scanner/config/env.js';
-import { processSchedulerTick } from '@/scanner/jobs/scheduler-tick.job.js';
-import type { SchedulerTickJobData } from '@/scanner/types/job-payload.js';
+import { env } from '@/bullmq/config/env.js';
+import { processSchedulerTick } from '@/bullmq/tasks/scanners/trivy/scheduler-tick.job.js';
+import type { SchedulerTickJobData } from '@/bullmq/types/job-payload.js';
 
 /**
  * Registers (or refreshes) the repeatable scheduler tick on `schedulerQueue`
@@ -21,12 +21,12 @@ export async function setupScheduler(
   inboundScanQueue: Queue,
   connection: Redis,
 ): Promise<Worker> {
-  // Idempotent — safe to call on every restart.
+  // Idempotent â€” safe to call on every restart.
   await schedulerQueue.upsertJobScheduler(
     'scan-all-images',
     {
       every: env.SCAN_INTERVAL_MS,
-      immediately: true // Immediate fan-out — first scan starts on boot, not after first interval.
+      immediately: true // Immediate fan-out â€” first scan starts on boot, not after first interval.
     },
     {
       name: 'scheduler-tick',

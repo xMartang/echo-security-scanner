@@ -62,4 +62,4 @@ COPY --from=build  --chown=nodeapp:nodeapp /app/dist         ./dist
 COPY --from=build  --chown=nodeapp:nodeapp /app/prisma       ./prisma
 COPY --chown=nodeapp:nodeapp package.json ./
 
-CMD ["node", "dist/scanner/index.js"]
+CMD ["node", "dist/bullmq/index.js"]

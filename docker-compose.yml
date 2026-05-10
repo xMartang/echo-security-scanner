@@ -70,7 +70,7 @@ services:
     logging: *default-logging
     # Pipe trivy output through tee so logs appear both in
     # `docker compose logs trivy` (stdout) and in ./logs/trivy.log on the host.
-    command: sh -c "trivy server --listen 0.0.0.0:8080 2>&1 | tee /var/log/app/trivy.log"
+    command: "server --listen 0.0.0.0:8080 > /var/log/app/trivy.log 2>&1"
     ports:
       - "8080:8080"
     volumes:
@@ -118,17 +118,17 @@ services:
       start_period: 30s
 
   # ── Scanner worker ──────────────────────────────────────────────────────────
-  scanner:
-    container_name: scanner
+  bullmq:
+    container_name: bullmq
     build:
       context: .
-      dockerfile: src/scanner/Dockerfile
+      dockerfile: src/bullmq/Dockerfile
       target: scanner-runtime
     restart: unless-stopped
     logging: *default-logging
     stop_grace_period: 30s
     environment:
-      SERVICE_NAME: scanner
+      SERVICE_NAME: bullmq
       NODE_ENV: production
       DATABASE_URL: postgresql://scanner:scanner@postgres:5432/scanner
       REDIS_URL: redis://redis:6379

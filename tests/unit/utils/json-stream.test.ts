@@ -1,8 +1,8 @@
-import { Readable } from 'node:stream';
+﻿import { Readable } from 'node:stream';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import { parseTrivyOutput } from '@/scanner/utils/json-stream.js';
+import { parseTrivyOutput } from '@/bullmq/tasks/scanners/trivy/utils/json-stream.js';
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), '../../fixtures');
 

@@ -1,9 +1,9 @@
-import { jest } from '@jest/globals';
+﻿import { jest } from '@jest/globals';
 import type { Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 
 // Mock queue.ts BEFORE any transitive import loads it.
-jest.unstable_mockModule('@/scanner/queue.js', () => ({
+jest.unstable_mockModule('@/bullmq/queue.js', () => ({
   scanQueue: {},
   schedulerQueue: {},
   connection: {},
@@ -18,7 +18,7 @@ jest.unstable_mockModule('bullmq', () => ({
 }));
 
 // Dynamic imports AFTER mocks are in place.
-const { setupScheduler } = await import('@/scanner/services/scheduler.service.js');
+const { setupScheduler } = await import('@/bullmq/services/scheduler.service.js');
 
 
 describe('setupScheduler', () => {

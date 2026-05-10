@@ -1,11 +1,11 @@
-import { jest } from '@jest/globals';
+﻿import { jest } from '@jest/globals';
 import type { Queue, Job } from 'bullmq';
-import type { SchedulerTickJobData } from '@/scanner/types/job-payload.js';
+import type { SchedulerTickJobData } from '@/bullmq/types/job-payload.js';
 
-// Must mock @/scanner/queue.js BEFORE any import that transitively loads it.
+// Must mock @/bullmq/queue.js BEFORE any import that transitively loads it.
 const mockAddBulkSingleton = jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]);
 const mockGetJobsSingleton = jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]);
-jest.unstable_mockModule('@/scanner/queue.js', () => ({
+jest.unstable_mockModule('@/bullmq/queue.js', () => ({
   scanQueue: { addBulk: mockAddBulkSingleton, getJobs: mockGetJobsSingleton },
   schedulerQueue: {},
   connection: {},
@@ -13,10 +13,10 @@ jest.unstable_mockModule('@/scanner/queue.js', () => ({
 
 // Dynamic imports after mock is in place
 const { buildScanJobs, enqueueScanJobs, processSchedulerTick } =
-  await import('@/scanner/jobs/scheduler-tick.job.js');
-const { IMAGES } = await import('@/scanner/config/images.js');
+  await import('@/bullmq/tasks/scanners/trivy/scheduler-tick.job.js');
+const { IMAGES } = await import('@/bullmq/tasks/scanners/trivy/images.js');
 
-// ── buildScanJobs (pure function — no mocks needed) ───────────────────────────
+// â”€â”€ buildScanJobs (pure function â€” no mocks needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('buildScanJobs', () => {
   const TRIGGERED_AT = '2026-05-10T00:00:00.000Z';
@@ -31,7 +31,7 @@ describe('buildScanJobs', () => {
     }
   });
 
-  it('jobId encodes imageName, imageTag, and triggeredAt (no colons — BullMQ v5)', () => {
+  it('jobId encodes imageName, imageTag, and triggeredAt (no colons â€” BullMQ v5)', () => {
     for (const job of buildScanJobs(IMAGES, TRIGGERED_AT)) {
       const expected = `scan__${job.data.imageName}__${job.data.imageTag}__${TRIGGERED_AT}`;
       expect(job.opts.jobId).toBe(expected);
@@ -57,7 +57,7 @@ describe('buildScanJobs', () => {
   });
 });
 
-// ── enqueueScanJobs (injectable queue — dedup via getJobs) ────────────────────
+// â”€â”€ enqueueScanJobs (injectable queue â€” dedup via getJobs) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('enqueueScanJobs', () => {
   it('enqueues all images when none are in-flight', async () => {
@@ -102,7 +102,7 @@ describe('enqueueScanJobs', () => {
   });
 });
 
-// ── processSchedulerTick (uses module-level scanQueue via singleton mock) ─────
+// â”€â”€ processSchedulerTick (uses module-level scanQueue via singleton mock) â”€â”€â”€â”€â”€
 
 describe('processSchedulerTick', () => {
   beforeEach(() => {

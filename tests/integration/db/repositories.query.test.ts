@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Integration tests for imageRepository and cveRepository query methods.
  * These are tested indirectly by the API route tests, but direct tests
  * catch regressions at the data layer before they surface as HTTP failures.
@@ -12,8 +12,8 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createImageRepository } from '@/common/db/repositories/image.repository.js';
 import { createCveRepository } from '@/common/db/repositories/cve.repository.js';
-import { persistScanResults } from '@/scanner/services/persistence.service.js';
-import type { ScanResult } from '@/scanner/types/scan-result.js';
+import { persistScanResults } from '@/bullmq/tasks/scanners/trivy/persistence.service.js';
+import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
 
 jest.setTimeout(180_000);
 
@@ -68,7 +68,7 @@ afterAll(async () => {
   await container?.stop();
 });
 
-// ── imageRepository.listWithSeveritySummary ───────────────────────────────────
+// â”€â”€ imageRepository.listWithSeveritySummary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('imageRepository.listWithSeveritySummary', () => {
   it('returns all scanned images', async () => {
@@ -102,7 +102,7 @@ describe('imageRepository.listWithSeveritySummary', () => {
   });
 });
 
-// ── imageRepository.findByCveId ───────────────────────────────────────────────
+// â”€â”€ imageRepository.findByCveId â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('imageRepository.findByCveId', () => {
   it('returns all images affected by a CVE string ID', async () => {
@@ -133,7 +133,7 @@ describe('imageRepository.findByCveId', () => {
   });
 });
 
-// ── cveRepository.findByImage ─────────────────────────────────────────────────
+// â”€â”€ cveRepository.findByImage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('cveRepository.findByImage', () => {
   it('returns all CVEs for a known image', async () => {
@@ -168,12 +168,12 @@ describe('cveRepository.findByImage', () => {
   });
 });
 
-// ── cveRepository.listDistinct ────────────────────────────────────────────────
+// â”€â”€ cveRepository.listDistinct â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('cveRepository.listDistinct', () => {
   it('returns distinct CVEs across all images', async () => {
     const cves = await cveRepo.listDistinct();
-    // CVE-A001 shared by nginx+redis, CVE-A002, CVE-A003 — 3 distinct CVEs
+    // CVE-A001 shared by nginx+redis, CVE-A002, CVE-A003 â€” 3 distinct CVEs
     expect(cves).toHaveLength(3);
   });
 
