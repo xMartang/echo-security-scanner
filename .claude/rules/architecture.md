@@ -1,5 +1,21 @@
 # Architectural Rules
 
+## Service Boundary
+The system is split into two independently deployable services:
+
+- **API service** (`src/api/`): owns the Express HTTP layer. Reads from the database only. Has no knowledge of Redis, BullMQ, Trivy, or scanner internals.
+- **Scanner service** (`src/scanner/`): owns Redis, BullMQ, and Trivy. Writes scan results to the database. Has no HTTP server.
+
+The **database is the only contract** between the two services.
+
+| Infrastructure | Owner |
+|---|---|
+| PostgreSQL (read) | API |
+| PostgreSQL (write) | Scanner |
+| Redis / BullMQ | Scanner only |
+| Trivy | Scanner only |
+| HTTP / Express | API only |
+
 ## Trivy Client/Server Strategy
 - **Mode:** NEVER run Trivy in standalone mode. Always use the `--server` flag pointing to the `trivy-server` container.
 - **Command:** `trivy image --server http://trivy-server:8080 --format json [IMAGE]`
@@ -44,3 +60,9 @@ Never delete and re-insert scan results; always upsert to preserve history and a
   2. Never exceed the actual number of tasks (images) in the batch.
   3. Minimum of 1 worker to ensure progress is always made.
 - **Reasoning:** Trivy scans are CPU-intensive; this prevents CPU starvation of the main Express thread and the Postgres/Redis containers.
+
+## Source Layout
+- Queue and worker code lives in `src/scanner/` (previously `src/queue/`).
+- Scanner services (ScannerService, SchedulerService, PersistenceService) live in `src/scanner/services/`.
+- API services (HealthService) live in `src/api/services/`.
+- Shared code (DB client, repositories, logger, errors) lives in `src/common/`.

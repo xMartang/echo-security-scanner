@@ -6,11 +6,11 @@
 - Constants: UPPER_CASE_SNAKE
 - Types/Interfaces: PascalCase (no `I` prefix)
 - Files: kebab-case (e.g., `scan-scheduler.ts`, `image-repository.ts`)
-- Prisma-generated types may be re-exported from `src/types/` with cleaner aliases if needed.
+- Prisma-generated types may be re-exported from the relevant service's `types/` directory with cleaner aliases if needed.
 
 ## Coding Standards
 - **Async:** Always use `async/await`; avoid raw callbacks or `.then()` chains.
-- **Error handling:** Use standard `Error` objects or custom classes extending `Error`. Define domain errors in `src/utils/errors.ts` (e.g., `ScanFailedError`, `ImageNotFoundError`).
+- **Error handling:** Use standard `Error` objects or custom classes extending `Error`. Define domain errors in `src/common/utils/errors.ts` (e.g., `ScanFailedError`, `ImageNotFoundError`).
 - **Comparisons:** Always use `===`.
 - **Imports:** ES Modules (`import`/`export`) at the top of every file. Use `.js` extensions in import paths (required for ESM + TypeScript).
 - **Return types:** Prefer explicit return types on all exported functions.
@@ -25,8 +25,8 @@
 ## Library-Specific Patterns
 
 ### Prisma
-- Access the DB only through repository functions in `src/db/`. Never import `PrismaClient` directly in services or routes.
-- Use a singleton `PrismaClient` instance exported from `src/db/client.ts`.
+- Access the DB only through repository functions in `src/common/db/`. Never import `PrismaClient` directly in services or routes.
+- Use a singleton `PrismaClient` instance exported from `src/common/db/client.ts`.
 - Wrap multi-step writes in `prisma.$transaction([...])` to ensure atomicity.
 
 ### BullMQ

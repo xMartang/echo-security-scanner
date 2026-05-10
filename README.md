@@ -7,20 +7,25 @@ A background service that periodically scans 10 fixed container images for CVE v
 ## Architecture overview
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌──────────────────┐
-│   Express   │     │   BullMQ    │     │  Trivy server    │
-│   API :3000 │     │   Worker    │────▶│  :8080           │
-└──────┬──────┘     └──────┬──────┘     └──────────────────┘
-       │                   │
-       ▼                   ▼
-  PostgreSQL :5432       Redis :6379
+┌─────────────┐                        ┌──────────────────┐
+│   Express   │                        │  Trivy server    │
+│  API :3000  │                        │  :8080           │
+└──────┬──────┘                        └────────▲─────────┘
+       │ (read)                                  │
+       ▼                               ┌─────────┴────────┐
+  PostgreSQL :5432  ◀──── (write) ─── │  Scanner service │
+                                       │  (BullMQ worker) │
+                         Redis :6379 ──│                  │
+                                       └──────────────────┘
 ```
 
-- **API**: serves the four REST endpoints (read-only queries).
-- **BullMQ worker**: scans images every 15 minutes; each image is a separate sandboxed job.
-- **Trivy server**: runs in server mode; the worker calls `trivy image --server` (no Docker socket needed on the worker).
-- **PostgreSQL** + **Prisma**: stores images, CVEs, packages, and join tables.
-- **Redis**: BullMQ job queue and scheduler backend.
+The system is split into two independently deployable services:
+
+- **API service** (`src/api/`): serves the REST endpoints with read-only DB queries. Has no knowledge of Redis, BullMQ, or Trivy.
+- **Scanner service** (`src/scanner/`): scans images every 15 minutes via BullMQ; each image is a separate sandboxed job. Writes results to PostgreSQL. Owns Redis and Trivy.
+- **Trivy server**: runs in server mode; the scanner calls `trivy image --server` (no Docker socket needed on the scanner).
+- **PostgreSQL** + **Prisma**: stores images, CVEs, packages, and join tables. The database is the only contract between API and Scanner.
+- **Redis**: BullMQ job queue and scheduler backend (Scanner only).
 
 ---
 
@@ -112,7 +117,7 @@ Expected — all five STATUS values should show `(healthy)`:
 
 ```
 echo-security-scanner-api-1          Up … (healthy)
-echo-security-scanner-bullmq-1       Up … (healthy)
+echo-security-scanner-scanner-1      Up … (healthy)
 echo-security-scanner-postgres-1     Up … (healthy)
 echo-security-scanner-redis-1        Up … (healthy)
 echo-security-scanner-trivy-server-1 Up … (healthy)
@@ -120,7 +125,7 @@ echo-security-scanner-trivy-server-1 Up … (healthy)
 
 ### 4. Wait for the first scan batch
 
-The BullMQ worker enqueues all 10 images on startup. Each scan takes 10–60 s depending on Trivy's cache state.
+The Scanner service enqueues all 10 images on startup. Each scan takes 10–60 s depending on Trivy's cache state.
 
 ```bash
 # Poll until at least one image shows SUCCESS
@@ -135,7 +140,7 @@ All responses use the envelope `{ data: T }` on success and `{ error: { message,
 
 ### `GET /health`
 
-Overall health of DB, Redis, and Trivy.
+Overall health of the API, including DB connectivity and scanner staleness (time since last successful scan).
 
 ```bash
 curl -s http://localhost:3000/health | jq
@@ -145,14 +150,16 @@ curl -s http://localhost:3000/health | jq
 {
   "data": {
     "db": "ok",
-    "redis": "ok",
-    "trivy": "ok",
+    "scanner": "ok",
     "status": "ok"
   }
 }
 ```
 
-Returns **200** if all components are healthy, **503** if any are degraded.
+- `db`: result of a lightweight DB ping.
+- `scanner`: `"ok"` if at least one image has been scanned recently, `"stale"` if no scans have completed within the expected interval.
+
+Returns **200** if healthy, **503** if degraded.
 
 ---
 
@@ -231,15 +238,15 @@ All app logs land in `./logs/` on the host. Each level file receives that level 
 | `logs/api.debug.1.log` | All log records (debug+) |
 | `logs/api.info.1.log` | Info, warn, error, fatal |
 | `logs/api.error.1.log` | Error and fatal only |
-| `logs/bullmq.*.log` | Same pattern for the worker |
+| `logs/scanner.*.log` | Same pattern for the scanner service |
 | `logs/postgres-YYYY-MM-DD.log` | Postgres server logs |
 
 ```bash
 # Stream info logs from the API
 tail -f logs/api.info.1.log | jq
 
-# Stream all records from the worker (scan progress, retries, etc.)
-tail -f logs/bullmq.debug.1.log | jq .msg
+# Stream all records from the scanner (scan progress, retries, etc.)
+tail -f logs/scanner.debug.1.log | jq .msg
 
 # Redis and Trivy use Docker's json-file driver
 docker compose logs -f redis
@@ -309,13 +316,13 @@ docker compose down -v
 | `architecture.md` | `cveId @unique`, single `packageId` FK on Vulnerability | Normalized: `Cve(cveId @unique)` + `Package` + `ImageVulnerability(imageId, cveId, packageId)` | Same CVE can affect multiple packages — original schema causes upsert collisions on real Trivy output |
 | `performance.md` | Worker Thread if `JSON.parse` > 100ms | `stream-json` streaming always | Streaming bounds memory and never blocks the event loop; Worker Thread overhead unjustified |
 | `docker.md` | Mount docker.sock on Worker and Trivy Server | Mount on `trivy-server` only | `trivy --server` sends the image reference to the server which pulls it; worker socket mount is unnecessary attack surface |
-| Compose service name | `worker` | Renamed `bullmq` | "worker" overloaded with BullMQ `Worker` class and Node.js Worker Threads |
+| Compose service name | `worker` | Renamed `scanner` | "worker" overloaded with BullMQ `Worker` class and Node.js Worker Threads; "bullmq" too implementation-specific |
 
 ---
 
 ## Notable implementation decisions
 
-- **Sandboxed BullMQ processors**: each scan job forks a child process. Crash-isolates Trivy and stream-json failures at the cost of one extra process per concurrent job.
+- **Sandboxed BullMQ processors**: each scan job forks a child process inside the Scanner service. Crash-isolates Trivy and stream-json failures at the cost of one extra process per concurrent job.
 - **Stable jobIds** (`scan__nginx__1.19`): BullMQ v5 forbids `:` in custom jobIds. A stable (no timestamp) ID means at most one active scan per image in the queue, preventing duplicate concurrent scans.
 - **Sequential test execution** (`--runInBand`): three integration test suites each start testcontainers (Postgres and/or Redis). Parallel execution exhausts resources on typical dev machines.
 - **Cumulative log routing**: `debug.log` receives all levels; `info.log` receives info and above; `error.log` receives error and fatal only — so operators can grep debug.log for the full picture or error.log for just failures.

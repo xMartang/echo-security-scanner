@@ -18,24 +18,40 @@ A background scanning service that periodically checks container images for CVE 
 ## Project Structure
 ```
 src/
-  api/          # Express routes and controllers
-  services/     # ScannerService, SchedulerService, HealthService
-  queue/        # BullMQ worker and job definitions
-  db/           # Prisma client singleton and repository layer
-  config/       # Env var validation (zod schemas)
-  types/        # Shared TypeScript types and interfaces
-  utils/
-    db/         # DB-related helpers (e.g. retryOnDBError)
-    log/        # Logging helpers (logger.ts, log-transport.mjs)
-    errors.ts   # Domain error classes
+  common/         # Shared by both services: DB, logger, errors, base env
+    config/
+      env.ts      # Base zod schema (DATABASE_URL, LOG_LEVEL, LOG_DIR, SERVICE_NAME)
+    db/           # Prisma client singleton + repositories
+    utils/
+      db/         # DB helpers (retryOnDBError)
+      errors.ts   # Domain error classes
+      log/        # Logger + log-transport.mjs
+  api/            # Express REST API service
+    index.ts      # API entrypoint
+    config/env.ts # API env (extends common + PORT)
+    app.ts        # Express app factory
+    controllers/  # REST controllers
+    middleware/   # Express middleware
+    routes/       # Route definitions
+    services/
+      health.service.ts  # DB + scanner staleness check
+    types/
+      api-envelope.ts
+  scanner/        # BullMQ scan worker service
+    index.ts      # Scanner entrypoint
+    config/env.ts # Scanner env (extends common + REDIS_URL, TRIVY_SERVER_URL, SCAN_INTERVAL_MS)
+    jobs/         # BullMQ job processors
+    queue.ts      # BullMQ queue + Redis connection
+    worker.ts     # Sandboxed worker factory
+    services/     # Scanner, persistence, scheduler services
+    types/        # job-payload, scan-result
+    utils/        # json-stream (Trivy output parser)
 prisma/
   schema.prisma
-docs/
-  architecture.md
-  conventions.md
-  docker.md
-  performance.md
 ```
+
+## Service Boundary
+API and Scanner share only the database. The API has no knowledge of Redis, BullMQ, Trivy, or scanner internals. The database is the only contract between the two services.
 
 ## Key Rules (read the docs)
 Each doc governs a specific layer — Claude must follow all of them:
@@ -58,27 +74,40 @@ Each doc governs a specific layer — Claude must follow all of them:
 - Log every request (method, path, status, duration) via middleware.
 
 ## Environment Variables
-All env vars must be declared and validated in `src/config/env.ts` using zod. No `process.env` access outside this file.
+All env vars must be declared and validated using zod in the service-specific `config/env.ts`. No `process.env` access outside these files.
 
-Required vars:
+**Common (both services)** — defined in `src/common/config/env.ts`:
 ```
 DATABASE_URL
+LOG_LEVEL     # default "info"
+LOG_DIR       # default "./logs"
+SERVICE_NAME
+```
+
+**API only** — extended in `src/api/config/env.ts`:
+```
+PORT          # default 3000
+```
+
+**Scanner only** — extended in `src/scanner/config/env.ts`:
+```
 REDIS_URL
 TRIVY_SERVER_URL      # e.g. http://trivy-server:8080
 SCAN_INTERVAL_MS      # default 900000 (15 min)
-PORT                  # default 3000
 ```
 
 ## Infrastructure Commands
-- `docker-compose up --build` — start the entire stack
+- `docker compose up --build` — start the entire stack
 - `pnpm prisma:migrate` — run database migrations (`prisma migrate dev`)
 - `pnpm prisma:studio` — open Prisma Studio
 - `pnpm build` — compile TypeScript
-- `pnpm dev` — run in dev mode (`tsx watch`)
+- `pnpm dev` — run API in dev mode (`tsx watch src/api/index.ts`)
+- `pnpm dev:worker` — run Scanner in dev mode (`tsx watch src/scanner/index.ts`)
 - `pnpm test` — run Jest
 - `pnpm lint` — run ESLint
 - `pnpm typecheck` — `tsc --noEmit`
-- `pnpm start` — run compiled output
+- `pnpm start` — run compiled API output
+- `pnpm start:worker` — run compiled Scanner output
 
 ## Naming Conventions (enforced in code review)
 - **No single-letter or cryptic variable names.** Exceptions: loop counters `i`, `j`, `k`.
