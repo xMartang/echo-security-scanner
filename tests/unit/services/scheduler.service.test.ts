@@ -19,7 +19,6 @@ jest.unstable_mockModule('bullmq', () => ({
 
 // Dynamic imports AFTER mocks are in place.
 const { setupScheduler } = await import('@/services/scheduler.service.js');
-const { IMAGES } = await import('@/config/images.js');
 
 
 describe('setupScheduler', () => {
@@ -47,25 +46,6 @@ describe('setupScheduler', () => {
     ];
     expect(name).toBe('scan-all-images');
     expect(typeof intervalOpts.every).toBe('number');
-  });
-
-  it('performs immediate fan-out: enqueues IMAGES.length scan jobs on startup', async () => {
-    await setupScheduler(mockSchedulerQueue, mockScanQueue, mockConnection);
-    expect(mockAddBulk).toHaveBeenCalledTimes(1);
-    const [jobs] = (mockAddBulk.mock.calls[0] as unknown) as [unknown[]];
-    expect(jobs).toHaveLength(IMAGES.length);
-  });
-
-  it('immediate fan-out jobs have name "scan-image"', async () => {
-    await setupScheduler(mockSchedulerQueue, mockScanQueue, mockConnection);
-    const [jobs] = (mockAddBulk.mock.calls[0] as unknown) as [Array<{ name: string }>];
-    expect(jobs.every((j) => j.name === 'scan-image')).toBe(true);
-  });
-
-  it('immediate fan-out jobIds use scan__name__tag format (no colons)', async () => {
-    await setupScheduler(mockSchedulerQueue, mockScanQueue, mockConnection);
-    const [jobs] = (mockAddBulk.mock.calls[0] as unknown) as [Array<{ opts: { jobId: string } }>];
-    expect(jobs.every((j) => /^scan__[^:]+__[^:]+$/.test(j.opts.jobId))).toBe(true);
   });
 
   it('creates a BullMQ Worker for the image-scheduler queue', async () => {

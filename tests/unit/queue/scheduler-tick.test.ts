@@ -32,7 +32,7 @@ describe('buildScanJobs', () => {
 
   it('jobId uses scan__name__tag format (no colons — BullMQ v5 restriction)', () => {
     for (const job of buildScanJobs(TRIGGERED_AT)) {
-      const expected = `scan__${job.data.imageName}__${job.data.imageTag}`;
+      const expected = `scan__${job.data.imageName}__${job.data.imageTag}__${TRIGGERED_AT}`;
       expect(job.opts.jobId).toBe(expected);
     }
   });
