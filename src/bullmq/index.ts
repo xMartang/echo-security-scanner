@@ -47,8 +47,8 @@ async function main() {
   const scanWorker = createScanWorker(connection);
   logger.info({ concurrency: scanWorker.concurrency }, 'scan worker started');
 
-  // Setup scheduler: register repeatable tick + immediate fan-out on startup.
-  const tickWorker = await setupScheduler(schedulerQueue, scanQueue, connection);
+  // Setup scheduler: register all repeatable tasks.
+  const [tickWorker, hygieneWorker] = await setupScheduler(schedulerQueue, scanQueue, connection);
   logger.info({ intervalMs: env.SCAN_INTERVAL_MS }, 'scheduler started');
 
   // â”€â”€ Graceful shutdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -72,6 +72,7 @@ async function main() {
         new Promise<void>((resolve) => setTimeout(resolve, 20_000)),
       ]);
       await tickWorker.close();
+      await hygieneWorker.close();
 
       await prisma.$disconnect();
       await connection.quit();

@@ -1,32 +1,35 @@
-﻿import { Worker } from 'bullmq';
+import { Worker, Queue as BullQueue } from 'bullmq';
 import type { Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
 import { env } from '@/bullmq/config/env.js';
 import { processSchedulerTick } from '@/bullmq/tasks/scanners/trivy/scheduler-tick.job.js';
+import { pruneStaleVulnerabilities } from '@/bullmq/tasks/hygiene/prune-stale-vulnerabilities.job.js';
 import type { SchedulerTickJobData } from '@/bullmq/types/job-payload.js';
 
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
 /**
- * Registers (or refreshes) the repeatable scheduler tick on `schedulerQueue`
- * and starts an in-process Worker that processes tick jobs by fan-out.
+ * Registers repeatable jobs and starts in-process workers.
  *
- * `inboundScanQueue` is the queue that scan jobs are added to; injected so
- * integration tests can pass a queue backed by a test Redis instance without
- * relying on the module-level singleton.
+ * Currently registered tasks:
+ *   1. scan-all-images   — Trivy CVE scanner, runs every SCAN_INTERVAL_MS
+ *   2. prune-stale-vulnerabilities — weekly storage hygiene (NOT staleness logic)
  *
- * Also triggers an immediate fan-out on startup so the first batch runs
- * without waiting up to SCAN_INTERVAL_MS.
+ * Adding a new task: create a module under tasks/, export a TaskConfig,
+ * import it here and add another upsertJobScheduler + Worker registration.
  */
 export async function setupScheduler(
   schedulerQueue: Queue,
   inboundScanQueue: Queue,
   connection: Redis,
-): Promise<Worker> {
-  // Idempotent â€” safe to call on every restart.
+): Promise<Worker[]> {
+  // ── Task 1: Trivy image scanner ──────────────────────────────────────────────
+  // Idempotent — safe to call on every restart.
   await schedulerQueue.upsertJobScheduler(
     'scan-all-images',
     {
       every: env.SCAN_INTERVAL_MS,
-      immediately: true // Immediate fan-out â€” first scan starts on boot, not after first interval.
+      immediately: true, // First scan starts on boot, not after the first interval.
     },
     {
       name: 'scheduler-tick',
@@ -34,11 +37,28 @@ export async function setupScheduler(
     },
   );
 
-  const tickWorker = new Worker<SchedulerTickJobData>(
+  const scanTickWorker = new Worker<SchedulerTickJobData>(
     'image-scheduler',
     processSchedulerTick,
     { connection, concurrency: 1 },
   );
 
-  return tickWorker;
+  // ── Task 2: Weekly storage hygiene ───────────────────────────────────────────
+  // Deletes ImageVulnerability rows not confirmed in 30+ days. This is NOT
+  // staleness logic — the API already excludes stale CVEs via lastSeenAt filter.
+  // This job prevents unbounded table growth over months of scanning.
+  const hygieneQueue = new BullQueue('hygiene', { connection });
+  await hygieneQueue.upsertJobScheduler(
+    'prune-stale-vulnerabilities',
+    { every: SEVEN_DAYS_MS },
+    { name: 'prune-stale-vulnerabilities', data: {} },
+  );
+
+  const hygieneWorker = new Worker(
+    'hygiene',
+    async () => { await pruneStaleVulnerabilities(); },
+    { connection, concurrency: 1 },
+  );
+
+  return [scanTickWorker, hygieneWorker];
 }
