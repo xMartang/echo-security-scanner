@@ -12,16 +12,14 @@
 import 'dotenv/config';
 import type { SandboxedJob } from 'bullmq';
 import { PrismaClient, ScanStatus } from '@prisma/client';
-import type { Prisma } from '@prisma/client';
 import type { ScanImageJobData, ScanImageJobResult } from '@/scanner/types/job-payload.js';
 import { env } from '@/scanner/config/env.js';
 import { createLogger } from '@/common/utils/log/logger.js';
 import { createImageRepository } from '@/common/db/repositories/image.repository.js';
+import { createScanHistoryRepository } from '@/common/db/repositories/scan-history.repository.js';
 import { persistScanResults } from '@/scanner/services/persistence.service.js';
 import { scan } from '@/scanner/services/scanner.service.js';
 import { retryOnDBError } from '@/common/utils/db/retry.js';
-
-const SCAN_HISTORY_MAX_ROWS = 1_000;
 
 // ── Lazy singletons ──────────────────────────────────────────────────────────
 
@@ -40,43 +38,6 @@ const logger = createLogger({
   level: env.LOG_LEVEL,
 });
 
-// ── Scan history ──────────────────────────────────────────────────────────────
-
-/**
- * Persists one row to ScanHistory and prunes the table to SCAN_HISTORY_MAX_ROWS.
- * Best-effort — callers should .catch() so a history failure never aborts a scan.
- */
-async function saveScanHistory(
-  db: PrismaClient,
-  data: {
-    imageName: string;
-    imageTag: string;
-    status: ScanStatus;
-    cveCount?: number;
-    cveSummary?: Prisma.InputJsonValue;
-    errorMessage?: string;
-    startedAt: Date;
-    completedAt: Date;
-  },
-): Promise<void> {
-  await db.scanHistory.create({ data });
-
-  // Prune oldest rows when the table exceeds the cap.
-  const totalCount = await db.scanHistory.count();
-  if (totalCount > SCAN_HISTORY_MAX_ROWS) {
-    const toDelete = await db.scanHistory.findMany({
-      orderBy: { startedAt: 'asc' },
-      take: totalCount - SCAN_HISTORY_MAX_ROWS,
-      select: { id: true },
-    });
-    if (toDelete.length > 0) {
-      await db.scanHistory.deleteMany({
-        where: { id: { in: toDelete.map((r) => r.id) } },
-      });
-    }
-  }
-}
-
 // ── Processor ────────────────────────────────────────────────────────────────
 
 /**
@@ -90,6 +51,7 @@ export async function processScanJob(
 ): Promise<ScanImageJobResult> {
   const db = prismaClient ?? getSharedPrisma();
   const repo = createImageRepository(db);
+  const historyRepo = createScanHistoryRepository(db);
   const imageRef = `${imageName}:${imageTag}`;
   const startedAt = new Date();
 
@@ -115,7 +77,7 @@ export async function processScanJob(
     }
 
     // 5. Write to ScanHistory (best-effort — don't let a history failure abort the scan).
-    await saveScanHistory(db, {
+    await historyRepo.save({
       imageName,
       imageTag,
       status: ScanStatus.SUCCESS,
@@ -140,7 +102,7 @@ export async function processScanJob(
     const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error({ err, image: imageRef }, 'scan failed');
 
-    await saveScanHistory(db, {
+    await historyRepo.save({
       imageName,
       imageTag,
       status: ScanStatus.FAILED,
