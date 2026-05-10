@@ -16,12 +16,12 @@ import { IMAGES } from '@/bullmq/tasks/scanners/trivy/images.js';
 
 jest.setTimeout(120_000);
 
-// Mock queue.ts BEFORE any transitive import loads it, so module-level singletons
-// never attempt to connect to env.REDIS_URL (which is unavailable in test context).
-jest.unstable_mockModule('@/bullmq/queue.js', () => ({
+// Mock connection and queues BEFORE any transitive import loads them, so module-level
+// singletons never attempt to connect to env.REDIS_URL (unavailable in test context).
+jest.unstable_mockModule('@/bullmq/connection.js', () => ({ connection: null }));
+jest.unstable_mockModule('@/bullmq/tasks/scanners/trivy/queues.js', () => ({
   scanQueue: null,
   schedulerQueue: null,
-  connection: null,
 }));
 
 // Dynamic imports AFTER mock

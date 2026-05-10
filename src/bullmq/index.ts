@@ -10,7 +10,8 @@ import { env } from '@/bullmq/config/env.js';
 import { createLogger } from '@/common/utils/log/logger.js';
 import { prisma } from '@/common/db/client.js';
 import { imageRepository } from '@/common/db/repositories/image.repository.js';
-import { connection, scanQueue, schedulerQueue } from '@/bullmq/queue.js';
+import { connection } from '@/bullmq/connection.js';
+import { scanQueue, schedulerQueue } from '@/bullmq/tasks/scanners/trivy/queues.js';
 import { createScanWorker } from '@/bullmq/tasks/scanners/trivy/worker.js';
 import { setupScheduler } from '@/bullmq/services/scheduler.service.js';
 

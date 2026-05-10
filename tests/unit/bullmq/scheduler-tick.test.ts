@@ -2,13 +2,12 @@
 import type { Queue, Job } from 'bullmq';
 import type { SchedulerTickJobData } from '@/bullmq/types/job-payload.js';
 
-// Must mock @/bullmq/queue.js BEFORE any import that transitively loads it.
+// Must mock queues BEFORE any import that transitively loads them.
 const mockAddBulkSingleton = jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]);
 const mockGetJobsSingleton = jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]);
-jest.unstable_mockModule('@/bullmq/queue.js', () => ({
+jest.unstable_mockModule('@/bullmq/tasks/scanners/trivy/queues.js', () => ({
   scanQueue: { addBulk: mockAddBulkSingleton, getJobs: mockGetJobsSingleton },
   schedulerQueue: {},
-  connection: {},
 }));
 
 // Dynamic imports after mock is in place

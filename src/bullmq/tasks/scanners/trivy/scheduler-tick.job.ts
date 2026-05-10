@@ -1,7 +1,7 @@
 ﻿import type { Job, Queue } from 'bullmq';
 import type { SchedulerTickJobData, ScanImageJobData } from '@/bullmq/types/job-payload.js';
 import { IMAGES, type ImageRef } from '@/bullmq/tasks/scanners/trivy/images.js';
-import { scanQueue } from '@/bullmq/queue.js';
+import { scanQueue } from '@/bullmq/tasks/scanners/trivy/queues.js';
 
 /**
  * Builds the list of scan jobs for a given set of images and tick timestamp.

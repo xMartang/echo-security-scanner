@@ -2,11 +2,11 @@
 import type { Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 
-// Mock queue.ts BEFORE any transitive import loads it.
-jest.unstable_mockModule('@/bullmq/queue.js', () => ({
+// Mock connection and queues BEFORE any transitive import loads them.
+jest.unstable_mockModule('@/bullmq/connection.js', () => ({ connection: {} }));
+jest.unstable_mockModule('@/bullmq/tasks/scanners/trivy/queues.js', () => ({
   scanQueue: {},
   schedulerQueue: {},
-  connection: {},
 }));
 
 // Mock BullMQ Worker so no Redis connection is attempted.
