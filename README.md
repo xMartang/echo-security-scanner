@@ -233,29 +233,29 @@ curl -s "http://localhost:3000/api/cves/CVE-2021-44228/images" | jq '.data'
 
 ## Log tailing
 
-All app logs land in `./logs/` on the host. Each level file receives that level **and above**:
+Each service writes logs to its own subfolder under `./logs/`. Level files receive that level **and above**:
 
 | File | Contents |
 |---|---|
-| `logs/api.debug.log.1` | All log records (debug+) — current file |
-| `logs/api.debug.log.2` | Previous rotated file (older = higher number) |
-| `logs/api.info.log.1` | Info, warn, error, fatal |
-| `logs/api.error.log.1` | Error and fatal only |
-| `logs/scanner.debug.log.1` | Same pattern for the scanner service |
-| `logs/postgres-YYYY-MM-DD.log` | Postgres server logs |
-| `logs/redis.log` | Redis server logs |
-| `logs/trivy.log` | Trivy server logs |
+| `logs/api/api.debug.log` | All API log records (debug+) — current file |
+| `logs/api/api.debug.log.1` | Previous rotated file (older = higher number) |
+| `logs/api/api.info.log` | Info, warn, error, fatal |
+| `logs/api/api.error.log` | Error and fatal only |
+| `logs/bullmq/bullmq.debug.log` | Same pattern for the BullMQ service |
+| `logs/postgres/postgres-YYYY-MM-DD.log` | Postgres server logs |
+| `logs/redis/redis.log` | Redis server logs |
+| `logs/trivy/trivy.log` | Trivy server logs |
 
 ```bash
-# Stream info logs from the API (.1 = current; .2 = previous after rotation)
-tail -f logs/api.info.log.1 | jq
+# Stream info logs from the API (no suffix = current file)
+tail -f logs/api/api.info.log | jq
 
-# Stream all records from the scanner (scan progress, retries, etc.)
-tail -f logs/scanner.debug.log.1 | jq .msg
+# Stream all records from the BullMQ service (scan progress, retries, etc.)
+tail -f logs/bullmq/bullmq.debug.log | jq .msg
 
-# Redis and Trivy logs are also in ./logs/
-tail -f logs/redis.log
-tail -f logs/trivy.log
+# Infrastructure logs
+tail -f logs/redis/redis.log
+tail -f logs/trivy/trivy.log
 
 # Or via Docker if you prefer
 docker compose logs -f redis

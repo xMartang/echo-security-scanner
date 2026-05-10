@@ -23,7 +23,7 @@ services:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
-      - ./logs:/var/log/app
+      - ./logs/postgres:/var/log/app
     # Write logs to /var/log/app/postgres-YYYY-MM-DD.log on the host mount.
     command: >
       postgres
@@ -51,7 +51,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-      - ./logs:/var/log/app
+      - ./logs/redis:/var/log/app
     # Pipe redis-server output through tee so logs appear both in
     # `docker compose logs redis` (stdout) and in ./logs/redis.log on the host.
     command: sh -c "redis-server --loglevel notice 2>&1 | tee /var/log/app/redis.log"
@@ -77,7 +77,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - trivy_cache:/root/.cache/
-      - ./logs:/var/log/app
+      - ./logs/trivy:/var/log/app
     healthcheck:
       # On first boot Trivy downloads the vulnerability DB (~several hundred MB).
       # start_period: 5m prevents Docker from marking it unhealthy during the download.
@@ -107,7 +107,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./logs:/var/log/app
+      - ./logs/api:/var/log/app
     depends_on:
       postgres:
         condition: service_healthy
@@ -138,7 +138,7 @@ services:
       LOG_LEVEL: info
       LOG_DIR: /var/log/app
     volumes:
-      - ./logs:/var/log/app
+      - ./logs/bullmq:/var/log/app
     depends_on:
       postgres:
         condition: service_healthy
