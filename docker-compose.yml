@@ -71,7 +71,7 @@ services:
     # Override entrypoint so the shell processes the pipe.
     # tee writes to both stdout (docker compose logs trivy) and the host-mounted file.
     entrypoint: ["sh", "-c"]
-    command: "trivy server --listen 0.0.0.0:8080 2>&1 | tee /var/log/app/trivy.log"
+    command: ["trivy server --listen 0.0.0.0:8080 2>&1 | tee /var/log/app/trivy.log"]
     ports:
       - "8080:8080"
     volumes:
