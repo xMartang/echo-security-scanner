@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 import { validateSeverity } from '@/api/middleware/validate-severity.js';
-import { ValidationError } from '@/utils/errors.js';
+import { ValidationError } from '@/common/utils/errors.js';
 
 function makeContext(severityQuery?: string) {
   return {

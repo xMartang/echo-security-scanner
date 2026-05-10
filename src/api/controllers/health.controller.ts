@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { HealthService } from '@/services/health.service.js';
+import type { HealthService } from '@/api/services/health.service.js';
 
 export function createHealthController(healthService: HealthService) {
   return {

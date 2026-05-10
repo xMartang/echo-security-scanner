@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import type pino from 'pino';
-import { ImageNotFoundError, ValidationError } from '@/utils/errors.js';
+import { ImageNotFoundError, ValidationError } from '@/common/utils/errors.js';
 
 /**
  * Global Express error handler (4-arg signature).

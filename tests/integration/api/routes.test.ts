@@ -12,7 +12,6 @@ import request from 'supertest';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import pino from 'pino';
-import type { Redis } from 'ioredis';
 import { createApp } from '@/api/app.js';
 import { persistScanResults } from '@/services/persistence.service.js';
 import type { ScanResult } from '@/types/scan-result.js';
@@ -22,8 +21,6 @@ jest.setTimeout(180_000);
 const require = createRequire(import.meta.url);
 const prismaCLI: string = require.resolve('prisma/build/index.js');
 const silentLogger = pino({ level: 'silent' });
-const mockRedis: Redis = { ping: () => Promise.resolve('PONG') } as unknown as Redis;
-
 let container: StartedTestContainer;
 let testDb: PrismaClient;
 let app: ReturnType<typeof createApp>;
@@ -60,7 +57,7 @@ beforeAll(async () => {
   await persistScanResults('nginx', '1.19', NGINX_SCAN, testDb);
   await persistScanResults('redis', '6.0', REDIS_SCAN, testDb);
 
-  app = createApp({ logger: silentLogger, db: testDb, redis: mockRedis, trivyUrl: 'http://localhost:9999' });
+  app = createApp({ logger: silentLogger, db: testDb });
 }, 180_000);
 
 afterAll(async () => {
@@ -74,20 +71,18 @@ type ApiData<T> = { data: T };
 // ── /health ───────────────────────────────────────────────────────────────────
 
 describe('GET /health', () => {
-  it('returns { data: { db, redis, trivy, status } }', async () => {
+  it('returns { data: { db, status } }', async () => {
     const res = await request(app).get('/health');
-    const body = res.body as ApiData<{ db: string; redis: string; trivy: string; status: string }>;
+    const body = res.body as ApiData<{ db: string; status: string }>;
     expect(['200', '503']).toContain(String(res.status));
     expect(body.data).toHaveProperty('db');
-    expect(body.data).toHaveProperty('redis');
-    expect(body.data).toHaveProperty('trivy');
+    expect(body.data).toHaveProperty('status');
   });
 
-  it('reports db and redis as ok (real containers)', async () => {
+  it('reports db as ok (real container)', async () => {
     const res = await request(app).get('/health');
-    const body = res.body as ApiData<{ db: string; redis: string }>;
+    const body = res.body as ApiData<{ db: string }>;
     expect(body.data.db).toBe('ok');
-    expect(body.data.redis).toBe('ok');
   });
 });
 

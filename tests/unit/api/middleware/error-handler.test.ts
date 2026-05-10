@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 import pino from 'pino';
 import { createErrorHandler } from '@/api/middleware/error-handler.js';
-import { ImageNotFoundError, ValidationError } from '@/utils/errors.js';
+import { ImageNotFoundError, ValidationError } from '@/common/utils/errors.js';
 
 const silentLogger = pino({ level: 'silent' });
 const handler = createErrorHandler(silentLogger);

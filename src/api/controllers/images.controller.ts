@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { Severity } from '@prisma/client';
-import type { ImageRepository } from '@/db/repositories/image.repository.js';
-import type { CveRepository } from '@/db/repositories/cve.repository.js';
+import type { ImageRepository } from '@/common/db/repositories/image.repository.js';
+import type { CveRepository } from '@/common/db/repositories/cve.repository.js';
 
 export function createImagesController(imageRepo: ImageRepository, cveRepo: CveRepository) {
   return {

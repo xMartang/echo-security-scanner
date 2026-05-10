@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Request, Response, NextFunction } from 'express';
-import { ValidationError } from '@/utils/errors.js';
+import { ValidationError } from '@/common/utils/errors.js';
 
 const SEVERITY_SCHEMA = z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']);
 

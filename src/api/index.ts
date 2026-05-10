@@ -1,13 +1,13 @@
 /**
  * API entrypoint — boots Express, listens on PORT, handles graceful shutdown.
  *
- * Expected env vars: SERVICE_NAME=api  DATABASE_URL  REDIS_URL  PORT  …
+ * Expected env vars: SERVICE_NAME=api  DATABASE_URL  PORT  …
  */
 
 import 'dotenv/config';
-import { env } from '@/config/env.js';
-import { createLogger } from '@/utils/log/logger.js';
-import { prisma } from '@/db/client.js';
+import { env } from '@/api/config/env.js';
+import { createLogger } from '@/common/utils/log/logger.js';
+import { prisma } from '@/common/db/client.js';
 import { createApp } from '@/api/app.js';
 
 const logger = createLogger({
