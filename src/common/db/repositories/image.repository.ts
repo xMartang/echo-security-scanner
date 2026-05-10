@@ -44,32 +44,43 @@ export function createImageRepository(db: PrismaClient) {
       return result.count;
     },
 
-    /** GET /api/images — images with CVE counts grouped by severity. */
+    /**
+     * GET /api/images — images with CVE counts grouped by severity.
+     * Only vulnerabilities confirmed by each image's latest scan are counted
+     * (lastSeenAt >= lastScannedAt). Stale CVEs are excluded.
+     */
     async listWithSeveritySummary() {
       const images = await db.image.findMany({
         include: {
           vulnerabilities: {
-            include: { cve: { select: { severity: true } } },
+            include: { cve: { select: { severity: true } }, },
           },
         },
         orderBy: [{ name: 'asc' }, { tag: 'asc' }],
       });
 
       return images.map((img) => {
+        // Filter to only vulnerabilities confirmed by the latest scan.
+        const activeVulns = img.vulnerabilities.filter(
+          (iv) =>
+            img.lastScannedAt !== null &&
+            iv.lastSeenAt >= img.lastScannedAt,
+        );
+
         const counts: Record<string, number> = {
-          CRITICAL: 0,
-          HIGH: 0,
-          MEDIUM: 0,
-          LOW: 0,
-          UNKNOWN: 0,
+          CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, UNKNOWN: 0,
         };
-        for (const iv of img.vulnerabilities) counts[iv.cve.severity]++;
+        for (const iv of activeVulns) counts[iv.cve.severity]++;
+
         const { vulnerabilities: _, ...rest } = img;
-        return { ...rest, cveCountBySeverity: { ...counts, total: img.vulnerabilities.length } };
+        return { ...rest, cveCountBySeverity: { ...counts, total: activeVulns.length } };
       });
     },
 
-    /** GET /api/cves/:cveId/images — all images affected by a given CVE string. */
+    /**
+     * GET /api/cves/:cveId/images — all images where this CVE was confirmed
+     * in the most recent scan (lastSeenAt >= lastScannedAt).
+     */
     async findByCveId(cveIdStr: string) {
       const cve = await db.cve.findUnique({ where: { cveId: cveIdStr } });
       if (!cve) return [];
@@ -80,12 +91,19 @@ export function createImageRepository(db: PrismaClient) {
         orderBy: [{ image: { name: 'asc' } }, { image: { tag: 'asc' } }],
       });
 
-      return ivs.map((iv) => ({
-        image: iv.image,
-        packageName: iv.package.name,
-        installedVersion: iv.installedVersion,
-        fixedVersion: iv.fixedVersion,
-      }));
+      // Post-filter: only include entries where this CVE is still active in the image's latest scan.
+      return ivs
+        .filter(
+          (iv) =>
+            iv.image.lastScannedAt !== null &&
+            iv.lastSeenAt >= iv.image.lastScannedAt,
+        )
+        .map((iv) => ({
+          image: iv.image,
+          packageName: iv.package.name,
+          installedVersion: iv.installedVersion,
+          fixedVersion: iv.fixedVersion,
+        }));
     },
   };
 }

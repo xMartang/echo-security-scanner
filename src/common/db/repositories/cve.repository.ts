@@ -6,7 +6,9 @@ export function createCveRepository(db: PrismaClient) {
   return {
     /**
      * GET /api/images/:name/:tag/cves
-     * Returns all CVEs for a specific image with optional severity filter.
+     * Returns CVEs confirmed by the most recent scan of the given image.
+     * CVEs not seen in the latest scan (lastSeenAt < lastScannedAt) are excluded —
+     * they are preserved in the DB as audit data but are no longer active.
      * Throws ImageNotFoundError if the image doesn't exist.
      */
     async findByImage(
@@ -20,6 +22,9 @@ export function createCveRepository(db: PrismaClient) {
       const ivs = await db.imageVulnerability.findMany({
         where: {
           imageId: image.id,
+          // Only vulnerabilities confirmed by the latest scan.
+          // If lastScannedAt is null the image has never completed a scan — return nothing.
+          lastSeenAt: { gte: image.lastScannedAt ?? new Date(0) },
           ...(severity ? { cve: { severity } } : {}),
         },
         include: { cve: true, package: true },
@@ -36,18 +41,38 @@ export function createCveRepository(db: PrismaClient) {
         packageName: iv.package.name,
         installedVersion: iv.installedVersion,
         fixedVersion: iv.fixedVersion,
+        firstSeenAt: iv.firstSeenAt,
+        lastSeenAt: iv.lastSeenAt,
       }));
     },
 
-    /** GET /api/cves — all unique CVEs with optional severity filter. */
+    /**
+     * GET /api/cves — distinct CVEs active in at least one image's latest scan.
+     * CVEs that were not confirmed by any image's most recent scan are excluded.
+     */
     async listDistinct(severity?: Severity) {
-      return db.cve.findMany({
+      const cves = await db.cve.findMany({
         where: severity ? { severity } : undefined,
         orderBy: [{ severity: 'asc' }, { cveId: 'asc' }],
         include: {
-          _count: { select: { vulnerabilities: true } },
+          vulnerabilities: {
+            include: {
+              image: { select: { lastScannedAt: true } },
+            },
+          },
         },
       });
+
+      // Post-filter: keep only CVEs with at least one active (current-scan) vulnerability.
+      return cves
+        .filter((cve) =>
+          cve.vulnerabilities.some(
+            (iv) =>
+              iv.image.lastScannedAt !== null &&
+              iv.lastSeenAt >= iv.image.lastScannedAt,
+          ),
+        )
+        .map(({ vulnerabilities: _, ...rest }) => rest);
     },
   };
 }
