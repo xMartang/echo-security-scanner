@@ -102,7 +102,10 @@ export default async function transport(opts) {
         return;
       }
 
-      route(obj.level, line + '\n');
+
+      const formattedLog = { ...obj, level: LOG_LABEL[obj.level] ?? String(obj.level) };
+      route(numericLevel, JSON.stringify(formattedLog) + '\n');
+
       callback();
     },
 
