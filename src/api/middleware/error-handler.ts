@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
+﻿import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import type pino from 'pino';
 import { ImageNotFoundError, ValidationError } from '@/common/utils/errors.js';
 
@@ -21,7 +21,7 @@ export function createErrorHandler(logger: pino.Logger): ErrorRequestHandler {
       return;
     }
 
-    // Unexpected error — log it and return a generic 500
+    // Unexpected error -- log it and return a generic 500
     logger.error({ err }, 'unhandled request error');
     res.status(500).json({ error: { message: 'Internal server error' } });
   };

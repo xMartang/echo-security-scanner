@@ -1,4 +1,4 @@
-import { createLogger } from '@/common/utils/log/logger.js';
+﻿import { createLogger } from '@/common/utils/log/logger.js';
 import { readdir, readFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,7 +8,7 @@ const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
 /**
  * Log file naming: current file = api.debug.log (symlink on Linux/Docker),
- * rotated files = api.debug.log.1, api.debug.log.2, …
+ * rotated files = api.debug.log.1, api.debug.log.2, ...
  * This helper finds whichever is present (symlink or numbered fallback).
  */
 async function readLevelFile(
@@ -22,7 +22,7 @@ async function readLevelFile(
     try {
       const files = await readdir(dir);
       // Prefer the symlink (api.debug.log); fall back to any numbered file
-      // (api.debug.log.1, api.debug.log.2, …) on platforms where symlinks
+      // (api.debug.log.1, api.debug.log.2, ...) on platforms where symlinks
       // are unavailable.
       const match =
         files.find((f) => f === `${serviceName}.${level}.log`) ??
@@ -47,7 +47,7 @@ describe('createLogger', () => {
     })();
   });
 
-  // ── timestamp format ────────────────────────────────────────────────────────
+  //   -  - timestamp format   -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 
   it('emits time as ISO-8601 string, not epoch ms', async () => {
     const logger = createLogger({ serviceName: 'ts-test', dir, level: 'debug' });
@@ -58,7 +58,7 @@ describe('createLogger', () => {
     expect(String(parsed.time)).toMatch(ISO_RE);
   });
 
-  // ── cumulative routing ──────────────────────────────────────────────────────
+  //   -  - cumulative routing   -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 
   it('debug records go to debug.log ONLY (below info threshold)', async () => {
     const logger = createLogger({ serviceName: 'test', dir, level: 'debug' });
@@ -66,7 +66,7 @@ describe('createLogger', () => {
     const content = await readLevelFile(dir, 'test', 'debug');
     expect(content).toContain('hello debug');
     expect(JSON.parse(content.trim())).toMatchObject({ level: 'debug', msg: 'hello debug' });
-    // debug is below info threshold — must NOT appear in info.log or error.log
+    // debug is below info threshold -- must NOT appear in info.log or error.log
     // Wait briefly for any stray writes then re-read
     await new Promise((r) => setTimeout(r, 300));
     const filesAfter = await readdir(dir);
@@ -114,7 +114,7 @@ describe('createLogger', () => {
 
   it('pino filters out debug-level records when logger level is info', async () => {
     const logger = createLogger({ serviceName: 'nodebug', dir, level: 'info' });
-    logger.debug('should not appear — below info threshold');
+    logger.debug('should not appear -- below info threshold');
     logger.info('trigger write to both debug.log and info.log');
     // debug.log exists (cumulative routing: info records land there too),
     // but must NOT contain the debug-level message pino suppressed.
@@ -123,7 +123,7 @@ describe('createLogger', () => {
     expect(debugContent).toContain('trigger write');
   });
 
-  // Verifies that logs land in ./logs/local/ — the plan's done-condition
+  // Verifies that logs land in ./logs/local/ -- the plan's done-condition
   it('writes to LOG_DIR when using the project log dir', async () => {
     const logger = createLogger({ serviceName: 'e2e-verify', dir: LOG_DIR, level: 'debug' });
     logger.info('e2e log entry');

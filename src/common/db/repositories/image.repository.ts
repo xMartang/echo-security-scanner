@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+﻿import type { PrismaClient } from '@prisma/client';
 import { ScanStatus } from '@prisma/client';
 import { prisma } from '@/common/db/client.js';
 
@@ -45,7 +45,7 @@ export function createImageRepository(db: PrismaClient) {
     },
 
     /**
-     * GET /api/images — images with CVE counts grouped by severity.
+     * GET /api/images -- images with CVE counts grouped by severity.
      * Only vulnerabilities confirmed by each image's latest scan are counted
      * (lastSeenAt >= lastScannedAt). Stale CVEs are excluded.
      */
@@ -78,7 +78,7 @@ export function createImageRepository(db: PrismaClient) {
     },
 
     /**
-     * GET /api/cves/:cveId/images — all images where this CVE was confirmed
+     * GET /api/cves/:cveId/images -- all images where this CVE was confirmed
      * in the most recent scan (lastSeenAt >= lastScannedAt).
      */
     async findByCveId(cveIdStr: string) {

@@ -1,4 +1,4 @@
-import pino from 'pino';
+﻿import pino from 'pino';
 import { fileURLToPath } from 'node:url';
 
 const transportPath = fileURLToPath(
@@ -13,8 +13,8 @@ export type LoggerOptions = {
 
 /**
  * Creates a pino logger with two transport targets:
- *  1. stdout  — for `docker logs` / dev console output
- *  2. file    — routed by level into ${serviceName}.{debug,info,error}.log
+ *  1. stdout  -- for `docker logs` / dev console output
+ *  2. file    -- routed by level into ${serviceName}.{debug,info,error}.log
  *               via log-transport.mjs (pino-roll, daily + 50 MB rotation)
  */
 export function createLogger(opts: LoggerOptions): pino.Logger {
@@ -27,7 +27,7 @@ export function createLogger(opts: LoggerOptions): pino.Logger {
     redact: ['req.headers.authorization', 'DATABASE_URL', 'REDIS_URL'],
     transport: {
       targets: [
-        // stdout — always present so `docker logs` works
+        // stdout -- always present so `docker logs` works
         { target: 'pino/file', options: { destination: 1 }, level: opts.level ?? 'info' },
         // per-level rotating files
         {

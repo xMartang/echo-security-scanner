@@ -1,4 +1,4 @@
-import { prisma } from '@/common/db/client.js';
+﻿import { prisma } from '@/common/db/client.js';
 import { createLogger } from '@/common/utils/log/logger.js';
 import { env } from '@/bullmq/config/env.js';
 import type { PrismaClient } from '@prisma/client';
@@ -7,7 +7,7 @@ import type { PrismaClient } from '@prisma/client';
  * Hard-deletes ImageVulnerability rows not confirmed by any scanner for 30+ days.
  *
  * This is STORAGE HYGIENE, not staleness logic. Staleness is already handled by the
- * lastSeenAt >= lastScannedAt filter in the repository layer — stale rows are invisible
+ * lastSeenAt >= lastScannedAt filter in the repository layer -- stale rows are invisible
  * to the API immediately after the scan that missed them. This job just prevents the
  * table from growing unbounded over months of continuous scanning.
  *

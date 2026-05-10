@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+﻿import { jest } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 import { validateSeverity } from '@/api/middleware/validate-severity.js';
 import { ValidationError } from '@/common/utils/errors.js';
@@ -36,7 +36,7 @@ describe('validateSeverity', () => {
     expect((err as ValidationError).field).toBe('severity');
   });
 
-  it('rejects UNKNOWN — it is an internal value, not a valid filter', () => {
+  it('rejects UNKNOWN -- it is an internal value, not a valid filter', () => {
     const { req, res, next } = makeContext('UNKNOWN');
     validateSeverity(req, res, next);
     const [err] = (next as jest.Mock).mock.calls[0] as [unknown];

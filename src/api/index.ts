@@ -1,7 +1,7 @@
-/**
- * API entrypoint — boots Express, listens on PORT, handles graceful shutdown.
+﻿/**
+ * API entrypoint -- boots Express, listens on PORT, handles graceful shutdown.
  *
- * Expected env vars: SERVICE_NAME=api  DATABASE_URL  PORT  …
+ * Expected env vars: SERVICE_NAME=api  DATABASE_URL  PORT  ...
  */
 
 import 'dotenv/config';
@@ -16,19 +16,19 @@ const logger = createLogger({
   level: env.LOG_LEVEL,
 });
 
-// ── Unhandled error guards ────────────────────────────────────────────────────
+//   -  - Unhandled error guards   -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 
 process.on('unhandledRejection', (reason) => {
-  logger.fatal({ err: reason }, 'unhandled rejection — exiting');
+  logger.fatal({ err: reason }, 'unhandled rejection -- exiting');
   process.exit(1);
 });
 
 process.on('uncaughtException', (err) => {
-  logger.fatal({ err }, 'uncaught exception — exiting');
+  logger.fatal({ err }, 'uncaught exception -- exiting');
   process.exit(1);
 });
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
+//   -  - Boot   -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 
 const app = createApp({
   logger,
@@ -39,7 +39,7 @@ const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, 'api listening');
 });
 
-// ── Graceful shutdown ─────────────────────────────────────────────────────────
+//   -  - Graceful shutdown   -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'shutdown signal received, draining api');

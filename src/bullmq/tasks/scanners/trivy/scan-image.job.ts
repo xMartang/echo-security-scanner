@@ -79,12 +79,6 @@ export async function processScanJob(
     );
     return { cveCount: result.vulnerabilities.length };
   } catch (err) {
-    // 5. Never throw out of the processor â€” log, update DB status, return.
-    //
-    // Pino's `err` serializer captures type, message, and full stack trace
-    // (including the "Caused by:" chain from ScanFailedError). This is the
-    // primary visibility mechanism since the bullmq sandbox is isolated from
-    // both the API process and the parent worker process.
     const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error({ err, image: imageRef }, 'scan failed');
     await repo.markFailed(image.id, errorMessage);
