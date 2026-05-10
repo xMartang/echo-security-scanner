@@ -12,9 +12,9 @@ import { PrismaClient, ScanStatus } from '@prisma/client';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
-import { createImageRepository } from '@/db/repositories/image.repository.js';
-import { persistScanResults } from '@/services/persistence.service.js';
-import type { ScanResult } from '@/types/scan-result.js';
+import { createImageRepository } from '@/common/db/repositories/image.repository.js';
+import { persistScanResults } from '@/scanner/services/persistence.service.js';
+import type { ScanResult } from '@/scanner/types/scan-result.js';
 
 // 3 minutes — container pull + start can be slow on first run.
 jest.setTimeout(180_000);

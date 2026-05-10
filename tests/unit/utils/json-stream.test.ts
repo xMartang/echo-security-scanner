@@ -2,7 +2,7 @@ import { Readable } from 'node:stream';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import { parseTrivyOutput } from '@/utils/json-stream.js';
+import { parseTrivyOutput } from '@/scanner/utils/json-stream.js';
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), '../../fixtures');
 

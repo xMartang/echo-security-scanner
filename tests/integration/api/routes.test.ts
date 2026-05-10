@@ -13,8 +13,8 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import pino from 'pino';
 import { createApp } from '@/api/app.js';
-import { persistScanResults } from '@/services/persistence.service.js';
-import type { ScanResult } from '@/types/scan-result.js';
+import { persistScanResults } from '@/scanner/services/persistence.service.js';
+import type { ScanResult } from '@/scanner/types/scan-result.js';
 
 jest.setTimeout(180_000);
 

@@ -12,20 +12,20 @@ import type { StartedTestContainer } from 'testcontainers';
 import { GenericContainer } from 'testcontainers';
 import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
-import { IMAGES } from '@/config/images.js';
+import { IMAGES } from '@/scanner/config/images.js';
 
 jest.setTimeout(120_000);
 
 // Mock queue.ts BEFORE any transitive import loads it, so module-level singletons
 // never attempt to connect to env.REDIS_URL (which is unavailable in test context).
-jest.unstable_mockModule('@/queue/queue.js', () => ({
+jest.unstable_mockModule('@/scanner/queue.js', () => ({
   scanQueue: null,
   schedulerQueue: null,
   connection: null,
 }));
 
 // Dynamic imports AFTER mock
-const { enqueueScanJobs } = await import('@/queue/jobs/scheduler-tick.job.js');
+const { enqueueScanJobs } = await import('@/scanner/jobs/scheduler-tick.job.js');
 
 let container: StartedTestContainer;
 let redis: Redis;

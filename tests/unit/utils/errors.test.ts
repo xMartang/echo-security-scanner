@@ -1,4 +1,4 @@
-import { ScanFailedError, ImageNotFoundError, ValidationError } from '@/utils/errors.js';
+import { ScanFailedError, ImageNotFoundError, ValidationError } from '@/common/utils/errors.js';
 
 describe('ScanFailedError', () => {
   it('is instanceof Error and ScanFailedError', () => {

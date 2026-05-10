@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import type { PrismaClient } from '@prisma/client';
 import { ScanStatus } from '@prisma/client';
-import { createImageRepository } from '@/db/repositories/image.repository.js';
+import { createImageRepository } from '@/common/db/repositories/image.repository.js';
 
 describe('imageRepository.markStuckScanningAsFailed', () => {
   it('marks SCANNING rows as FAILED and returns count', async () => {

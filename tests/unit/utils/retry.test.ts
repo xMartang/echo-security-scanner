@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { Prisma } from '@prisma/client';
-import { retryOnDBError } from '@/utils/db/retry.js';
+import { retryOnDBError } from '@/common/utils/db/retry.js';
 
 function makeDeadlockError(): Prisma.PrismaClientKnownRequestError {
   return new Prisma.PrismaClientKnownRequestError('deadlock detected', {

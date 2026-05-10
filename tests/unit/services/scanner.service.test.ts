@@ -12,8 +12,8 @@ jest.unstable_mockModule('execa', () => ({ execa: mockExeca }));
 
 // Dynamic import AFTER the mock is registered
 const [{ scan, parseScanOutputStream }, { ScanFailedError }] = await Promise.all([
-  import('@/services/scanner.service.js'),
-  import('@/utils/errors.js'),
+  import('@/scanner/services/scanner.service.js'),
+  import('@/common/utils/errors.js'),
 ]);
 
 // ── parseScanOutputStream (no execa needed) ──────────────────────────────────

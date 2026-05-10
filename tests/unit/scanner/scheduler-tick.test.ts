@@ -1,10 +1,10 @@
 import { jest } from '@jest/globals';
 import type { Queue, Job } from 'bullmq';
-import type { SchedulerTickJobData } from '@/types/job-payload.js';
+import type { SchedulerTickJobData } from '@/scanner/types/job-payload.js';
 
-// Must mock @/queue/queue.js BEFORE any import that transitively loads it.
+// Must mock @/scanner/queue.js BEFORE any import that transitively loads it.
 const mockAddBulkSingleton = jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]);
-jest.unstable_mockModule('@/queue/queue.js', () => ({
+jest.unstable_mockModule('@/scanner/queue.js', () => ({
   scanQueue: { addBulk: mockAddBulkSingleton },
   schedulerQueue: {},
   connection: {},
@@ -12,8 +12,8 @@ jest.unstable_mockModule('@/queue/queue.js', () => ({
 
 // Dynamic imports after mock is in place
 const { buildScanJobs, enqueueScanJobs, processSchedulerTick } =
-  await import('@/queue/jobs/scheduler-tick.job.js');
-const { IMAGES } = await import('@/config/images.js');
+  await import('@/scanner/jobs/scheduler-tick.job.js');
+const { IMAGES } = await import('@/scanner/config/images.js');
 
 // ── buildScanJobs (pure function — no mocks needed) ───────────────────────────
 

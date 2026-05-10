@@ -1,4 +1,4 @@
-import { calculateConcurrency } from '@/queue/worker.js';
+import { calculateConcurrency } from '@/scanner/worker.js';
 
 describe('calculateConcurrency', () => {
   it('uses half of available parallelism', () => {

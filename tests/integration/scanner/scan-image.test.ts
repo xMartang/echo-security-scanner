@@ -17,12 +17,12 @@ import { createRequire } from 'node:module';
 
 // Mock scanner before importing the processor
 const mockScan = jest.fn<() => Promise<{ result: object; stderr: string }>>();
-jest.unstable_mockModule('@/services/scanner.service.js', () => ({
+jest.unstable_mockModule('@/scanner/services/scanner.service.js', () => ({
   scan: mockScan,
   parseScanOutputStream: jest.fn(),
 }));
 
-const { processScanJob } = await import('@/queue/jobs/scan-image.job.js');
+const { processScanJob } = await import('@/scanner/jobs/scan-image.job.js');
 
 const require = createRequire(import.meta.url);
 const prismaCLI: string = require.resolve('prisma/build/index.js');

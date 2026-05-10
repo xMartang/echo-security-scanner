@@ -10,10 +10,10 @@ import { GenericContainer } from 'testcontainers';
 import { PrismaClient } from '@prisma/client';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { createImageRepository } from '@/db/repositories/image.repository.js';
-import { createCveRepository } from '@/db/repositories/cve.repository.js';
-import { persistScanResults } from '@/services/persistence.service.js';
-import type { ScanResult } from '@/types/scan-result.js';
+import { createImageRepository } from '@/common/db/repositories/image.repository.js';
+import { createCveRepository } from '@/common/db/repositories/cve.repository.js';
+import { persistScanResults } from '@/scanner/services/persistence.service.js';
+import type { ScanResult } from '@/scanner/types/scan-result.js';
 
 jest.setTimeout(180_000);
 
@@ -163,7 +163,7 @@ describe('cveRepository.findByImage', () => {
   });
 
   it('throws ImageNotFoundError for unknown image', async () => {
-    const { ImageNotFoundError } = await import('@/utils/errors.js');
+    const { ImageNotFoundError } = await import('@/common/utils/errors.js');
     await expect(cveRepo.findByImage('ghost', 'latest')).rejects.toBeInstanceOf(ImageNotFoundError);
   });
 });
