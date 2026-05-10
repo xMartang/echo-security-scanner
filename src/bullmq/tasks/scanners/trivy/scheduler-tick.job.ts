@@ -1,18 +1,18 @@
-﻿import type { Job, Queue } from 'bullmq';
+import type { Job, Queue } from 'bullmq';
 import type { SchedulerTickJobData, ScanImageJobData } from '@/bullmq/types/job-payload.js';
 import { IMAGES, type ImageRef } from '@/bullmq/tasks/scanners/trivy/images.js';
 import { scanQueue } from '@/bullmq/tasks/scanners/trivy/queues.js';
 
 /**
  * Builds the list of scan jobs for a given set of images and tick timestamp.
- * Pure function â€” exported so tests can verify job structure without touching Redis.
+ * Pure function -- exported so tests can verify job structure without touching Redis.
  *
  * jobId includes the tick timestamp so each tick produces unique IDs, enabling
  * BullMQ native job history (removeOnComplete: { count: N }) to work correctly.
  * Deduplication of concurrent scans is handled by enqueueScanJobs() via queue
  * state inspection rather than ID uniqueness.
  *
- * BullMQ v5 forbids ':' in custom jobIds â€” '__' used as separator.
+ * BullMQ v5 forbids ':' in custom jobIds -- '__' used as separator.
  */
 export function buildScanJobs(images: readonly ImageRef[], triggeredAt: string) {
   return images.map((img) => ({
@@ -33,7 +33,7 @@ export function buildScanJobs(images: readonly ImageRef[], triggeredAt: string) 
  * Enqueues scan jobs for images not already waiting or actively scanning.
  *
  * Dedup strategy: inspect queue state before adding. getJobs(['waiting','active'])
- * returns at most IMAGES.length items â€” negligible cost. Single-process worker means
+ * returns at most IMAGES.length items -- negligible cost. Single-process worker means
  * no cross-process race condition.
  */
 export async function enqueueScanJobs(queue: Queue, triggeredAt: string): Promise<void> {
@@ -58,7 +58,7 @@ export async function enqueueScanJobs(queue: Queue, triggeredAt: string): Promis
 
 /**
  * In-process tick processor consumed by BullMQ Worker.
- * Uses the singleton scanQueue â€” not sandboxed because it only enqueues, no Trivy work.
+ * Uses the singleton scanQueue -- not sandboxed because it only enqueues, no Trivy work.
  */
 export async function processSchedulerTick(job: Job<SchedulerTickJobData>): Promise<void> {
   const triggeredAt = job.data.triggeredAt ?? new Date().toISOString();

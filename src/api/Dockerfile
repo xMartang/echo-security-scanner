@@ -1,4 +1,4 @@
-﻿# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1
 
 # -- Shared stages (keep in sync with src/bullmq/Dockerfile) --
 # Both Dockerfiles repeat these stages; Docker BuildKit layer caching ensures

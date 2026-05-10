@@ -1,4 +1,4 @@
-﻿import { jest } from '@jest/globals';
+import { jest } from '@jest/globals';
 import { Readable } from 'node:stream';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path';
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), '../../fixtures');
 
-// â”€â”€ Mock execa at module scope so scanner.service.ts picks it up on import â”€â”€
+// "-- Mock execa at module scope so scanner.service.ts picks it up on import "--
 const mockExeca = jest.fn<() => object>();
 jest.unstable_mockModule('execa', () => ({ execa: mockExeca }));
 
@@ -16,7 +16,7 @@ const [{ scan, parseScanOutputStream }, { ScanFailedError }] = await Promise.all
   import('@/common/utils/errors.js'),
 ]);
 
-// â”€â”€ parseScanOutputStream (no execa needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- parseScanOutputStream (no execa needed) "------------------------------------------------------------------
 
 describe('parseScanOutputStream', () => {
   it('parses fixture JSON from a readable stream', async () => {
@@ -27,7 +27,7 @@ describe('parseScanOutputStream', () => {
   });
 });
 
-// â”€â”€ scan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- scan "----------------------------------------------------------------------------------------------------------------------------------------
 
 describe('scan', () => {
   beforeEach(() => mockExeca.mockReset());

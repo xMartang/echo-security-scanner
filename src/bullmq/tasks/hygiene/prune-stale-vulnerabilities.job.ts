@@ -1,4 +1,4 @@
-﻿import { prisma } from '@/common/db/client.js';
+import { prisma } from '@/common/db/client.js';
 import { createLogger } from '@/common/utils/log/logger.js';
 import { env } from '@/bullmq/config/env.js';
 import type { PrismaClient } from '@prisma/client';

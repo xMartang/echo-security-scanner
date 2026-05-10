@@ -1,4 +1,4 @@
-﻿import { Worker, Queue as BullQueue } from 'bullmq';
+import { Worker, Queue as BullQueue } from 'bullmq';
 import type { Queue } from 'bullmq';
 import type { Redis } from 'ioredis';
 import { env } from '@/bullmq/config/env.js';

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Sandboxed BullMQ processor for `scan-image` jobs.
  *
  * BullMQ forks a child process per job and `import()`s this file. The child
@@ -20,7 +20,7 @@ import { persistScanResults } from '@/bullmq/tasks/scanners/trivy/persistence.se
 import { scan } from '@/bullmq/tasks/scanners/trivy/scanner.service.js';
 import { retryOnDBError } from '@/common/utils/db/retry.js';
 
-// â”€â”€ Lazy singletons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- Lazy singletons "------------------------------------------------------------------------------------------------------------------
 
 let sharedPrisma: PrismaClient | undefined;
 function getSharedPrisma(): PrismaClient {
@@ -37,10 +37,10 @@ const logger = createLogger({
   level: env.LOG_LEVEL,
 });
 
-// â”€â”€ Processor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- Processor "------------------------------------------------------------------------------------------------------------------------------
 
 /**
- * Core scan logic â€” exported so integration tests can call it directly without
+ * Core scan logic -- exported so integration tests can call it directly without
  * going through the BullMQ sandbox (which requires compiled JS on disk).
  */
 export async function processScanJob(
@@ -62,7 +62,7 @@ export async function processScanJob(
     const { result, stderr } = await scan(imageName, imageTag);
     if (stderr) logger.debug({ image: imageRef, stderr }, 'trivy stderr output');
 
-    // 3. Persist CVE results â€” wrap with retryOnDBError for transient Postgres errors.
+    // 3. Persist CVE results -- wrap with retryOnDBError for transient Postgres errors.
     await retryOnDBError(
       () => persistScanResults(imageName, imageTag, result, db),
     );

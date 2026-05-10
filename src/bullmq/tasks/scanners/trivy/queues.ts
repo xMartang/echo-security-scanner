@@ -1,4 +1,4 @@
-﻿import { Queue } from 'bullmq';
+import { Queue } from 'bullmq';
 import type { ScanImageJobData, SchedulerTickJobData } from '@/bullmq/types/job-payload.js';
 import { connection } from '@/bullmq/connection.js';
 

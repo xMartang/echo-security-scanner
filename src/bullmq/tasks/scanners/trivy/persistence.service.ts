@@ -1,4 +1,4 @@
-﻿// KNOWN LIMITATION (multi-scanner scheduling): lastSeenAt filtering works correctly
+// KNOWN LIMITATION (multi-scanner scheduling): lastSeenAt filtering works correctly
 // with multiple scanners -- any scanner confirming a CVE updates lastSeenAt, keeping
 // it visible. A CVE is only stale when NO scanner has confirmed it since the last
 // scan cycle, which is the correct behaviour regardless of scanner count.
@@ -48,7 +48,7 @@ export async function persistScanResults(
   });
 
   await db.$transaction(async (trx) => {
-    // 1. Upsert Image â€" establishes the FK anchor for all join tables.
+    // 1. Upsert Image -- establishes the FK anchor for all join tables.
     const image = await trx.image.upsert({
       where: { name_tag: { name: imageName, tag: imageTag } },
       create: { name: imageName, tag: imageTag },
@@ -56,7 +56,7 @@ export async function persistScanResults(
     });
 
     // 2. Upsert Packages (sorted by name).
-    const packageIdByName = new Map<string, number>(); // package name â†' db id
+    const packageIdByName = new Map<string, number>(); // package name -> db id
     for (const pkg of sortedPackages) {
       const savedPackage = await trx.package.upsert({
         where: { name: pkg.name },
@@ -68,7 +68,7 @@ export async function persistScanResults(
 
     // 3. Upsert CVEs (sorted by cveId; update severity/description on each run
     //    in case Trivy revises them in a subsequent database update).
-    const cveDbIdByCveId = new Map<string, number>(); // cve string id â†' db row id
+    const cveDbIdByCveId = new Map<string, number>(); // cve string id -> db row id
     for (const vulnerability of sortedVulns) {
       if (cveDbIdByCveId.has(vulnerability.cveId)) continue; // deduplicate same CVE across packages
       const savedCve = await trx.cve.upsert({

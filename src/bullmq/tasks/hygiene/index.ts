@@ -1,4 +1,4 @@
-﻿import type { TaskConfig } from '@/bullmq/tasks/task.types.js';
+import type { TaskConfig } from '@/bullmq/tasks/task.types.js';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 

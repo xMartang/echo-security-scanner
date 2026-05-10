@@ -1,4 +1,4 @@
-﻿import { Readable } from 'node:stream';
+import { Readable } from 'node:stream';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';

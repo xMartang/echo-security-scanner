@@ -1,4 +1,4 @@
-﻿import { execa } from 'execa';
+import { execa } from 'execa';
 import type { Readable } from 'node:stream';
 import { env } from '@/bullmq/config/env.js';
 import { ScanFailedError } from '@/common/utils/errors.js';
@@ -7,7 +7,7 @@ import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result
 
 export type ScanOutput = {
   result: ScanResult;
-  /** Raw stderr from the trivy process â€” may contain warnings even on success. */
+  /** Raw stderr from the trivy process -- may contain warnings even on success. */
   stderr: string;
 };
 

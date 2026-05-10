@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Integration tests for the scheduler against a real Redis testcontainer.
  *
  * Scope: verifies that `enqueueScanJobs` actually lands jobs in BullMQ/Redis,
@@ -55,7 +55,7 @@ afterEach(async () => {
   await schedulerQueue.obliterate({ force: true });
 });
 
-// â”€â”€ enqueueScanJobs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- enqueueScanJobs "--------------------------------------------------------------------------------------------------------------------
 
 describe('enqueueScanJobs (real Redis)', () => {
   it('adds IMAGES.length jobs to the scan queue', async () => {
@@ -63,7 +63,7 @@ describe('enqueueScanJobs (real Redis)', () => {
     expect(await scanQueue.getWaitingCount()).toBe(IMAGES.length);
   });
 
-  it('stable jobIds â€” calling twice is idempotent (no duplicates)', async () => {
+  it('stable jobIds -- calling twice is idempotent (no duplicates)', async () => {
     await enqueueScanJobs(scanQueue, new Date().toISOString());
     await enqueueScanJobs(scanQueue, new Date().toISOString());
     expect(await scanQueue.getWaitingCount()).toBe(IMAGES.length);
@@ -90,7 +90,7 @@ describe('enqueueScanJobs (real Redis)', () => {
   });
 });
 
-// â”€â”€ schedulerQueue.upsertJobScheduler (smoke â€” verifies no throw with real Redis) â”€â”€
+// "-- schedulerQueue.upsertJobScheduler (smoke -- verifies no throw with real Redis) "--
 
 describe('upsertJobScheduler (real Redis)', () => {
   it('resolves without throwing', async () => {
@@ -103,7 +103,7 @@ describe('upsertJobScheduler (real Redis)', () => {
     ).resolves.toBeDefined();
   });
 
-  it('is idempotent â€” calling twice does not throw', async () => {
+  it('is idempotent -- calling twice does not throw', async () => {
     const opts = { every: 900_000 };
     const template = { name: 'scheduler-tick', data: { triggeredAt: new Date().toISOString() } };
     await schedulerQueue.upsertJobScheduler('scan-all-images', opts, template);

@@ -1,4 +1,4 @@
-﻿import { calculateConcurrency } from '@/bullmq/tasks/scanners/trivy/worker.js';
+import { calculateConcurrency } from '@/bullmq/tasks/scanners/trivy/worker.js';
 
 describe('calculateConcurrency', () => {
   it('uses half of available parallelism', () => {

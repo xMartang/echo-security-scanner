@@ -1,4 +1,4 @@
-﻿import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { ScanStatus } from '@prisma/client';
 import { prisma } from '@/common/db/client.js';
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Pino worker-thread transport.
  *
  * Each log file receives its named level AND everything above it:

@@ -1,7 +1,7 @@
-﻿/**
+/**
  * Integration tests for /health, /api/images, and /api/cves routes.
  * Uses testcontainers Postgres with real migrations + seeded data.
- * Redis and Trivy are mocked â€” no extra containers needed.
+ * Redis and Trivy are mocked -- no extra containers needed.
  */
 
 import { jest } from '@jest/globals';
@@ -65,10 +65,10 @@ afterAll(async () => {
   await container?.stop();
 });
 
-// Typed helper â€” supertest body is `any` but we want type safety in assertions.
+// Typed helper -- supertest body is `any` but we want type safety in assertions.
 type ApiData<T> = { data: T };
 
-// â”€â”€ /health â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- /health "------------------------------------------------------------------------------------------------------------------------------------
 
 describe('GET /health', () => {
   it('returns { data: { db, status } }', async () => {
@@ -86,7 +86,7 @@ describe('GET /health', () => {
   });
 });
 
-// â”€â”€ /api/images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- /api/images "----------------------------------------------------------------------------------------------------------------------------
 
 describe('GET /api/images', () => {
   it('returns all scanned images wrapped in { data }', async () => {
@@ -104,7 +104,7 @@ describe('GET /api/images', () => {
   });
 });
 
-// â”€â”€ /api/images/:name/:tag/cves â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- /api/images/:name/:tag/cves "--------------------------------------------------------------------------------------------
 
 describe('GET /api/images/:name/:tag/cves', () => {
   it('returns CVEs for a known image', async () => {
@@ -135,7 +135,7 @@ describe('GET /api/images/:name/:tag/cves', () => {
   });
 });
 
-// â”€â”€ /api/cves â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- /api/cves "--------------------------------------------------------------------------------------------------------------------------------
 
 describe('GET /api/cves', () => {
   it('returns all distinct CVEs', async () => {
@@ -159,7 +159,7 @@ describe('GET /api/cves', () => {
   });
 });
 
-// â”€â”€ /api/cves/:cveId/images â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- /api/cves/:cveId/images "----------------------------------------------------------------------------------------------------
 
 describe('GET /api/cves/:cveId/images', () => {
   it('returns all images affected by a CVE', async () => {

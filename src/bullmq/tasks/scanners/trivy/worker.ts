@@ -1,4 +1,4 @@
-﻿import os from 'node:os';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'bullmq';
 import type { ConnectionOptions } from 'bullmq';

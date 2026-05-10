@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Integration tests for imageRepository and cveRepository query methods.
  * These are tested indirectly by the API route tests, but direct tests
  * catch regressions at the data layer before they surface as HTTP failures.
@@ -68,7 +68,7 @@ afterAll(async () => {
   await container?.stop();
 });
 
-// â”€â”€ imageRepository.listWithSeveritySummary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- imageRepository.listWithSeveritySummary "--------------------------------------------------------------------
 
 describe('imageRepository.listWithSeveritySummary', () => {
   it('returns all scanned images', async () => {
@@ -102,7 +102,7 @@ describe('imageRepository.listWithSeveritySummary', () => {
   });
 });
 
-// â”€â”€ imageRepository.findByCveId â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- imageRepository.findByCveId "--------------------------------------------------------------------------------------------
 
 describe('imageRepository.findByCveId', () => {
   it('returns all images affected by a CVE string ID', async () => {
@@ -133,7 +133,7 @@ describe('imageRepository.findByCveId', () => {
   });
 });
 
-// â”€â”€ cveRepository.findByImage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- cveRepository.findByImage "------------------------------------------------------------------------------------------------
 
 describe('cveRepository.findByImage', () => {
   it('returns all CVEs for a known image', async () => {
@@ -168,12 +168,12 @@ describe('cveRepository.findByImage', () => {
   });
 });
 
-// â”€â”€ cveRepository.listDistinct â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- cveRepository.listDistinct "----------------------------------------------------------------------------------------------
 
 describe('cveRepository.listDistinct', () => {
   it('returns distinct CVEs across all images', async () => {
     const cves = await cveRepo.listDistinct();
-    // CVE-A001 shared by nginx+redis, CVE-A002, CVE-A003 â€” 3 distinct CVEs
+    // CVE-A001 shared by nginx+redis, CVE-A002, CVE-A003 -- 3 distinct CVEs
     expect(cves).toHaveLength(3);
   });
 

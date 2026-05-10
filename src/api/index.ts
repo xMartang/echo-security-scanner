@@ -1,4 +1,4 @@
-﻿/**
+/**
  * API entrypoint -- boots Express, listens on PORT, handles graceful shutdown.
  *
  * Expected env vars: SERVICE_NAME=api  DATABASE_URL  PORT  ...

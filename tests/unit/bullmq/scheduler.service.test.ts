@@ -1,4 +1,4 @@
-﻿import { jest } from '@jest/globals';
+import { jest } from '@jest/globals';
 import type { Queue, Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 

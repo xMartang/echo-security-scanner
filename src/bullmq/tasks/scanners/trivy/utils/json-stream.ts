@@ -1,9 +1,9 @@
-﻿import { createRequire } from 'node:module';
+import { createRequire } from 'node:module';
 import type { Readable, Transform } from 'node:stream';
 import type { Severity } from '@prisma/client';
 import type { ScanResult, ScanResultPackage, ScanResultVulnerability } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
 
-// CJS interop â€” stream-json does not ship ESM exports.
+// CJS interop -- stream-json does not ship ESM exports.
 const require = createRequire(import.meta.url);
 const { parser: createParser } = require('stream-json') as { parser: () => Transform };
 const { pick: createPick } = require('stream-json/filters/Pick') as {
@@ -13,7 +13,7 @@ const { streamArray: createStreamArray } = require('stream-json/streamers/Stream
   streamArray: () => Transform;
 };
 
-// Raw Trivy output types (not exported â€” only used inside this module)
+// Raw Trivy output types (not exported -- only used inside this module)
 type TrivyPackage = { Name: string; Version?: string };
 type TrivyVulnerability = {
   VulnerabilityID: string;
@@ -49,7 +49,7 @@ function normalizeSeverity(raw: string | undefined): Severity {
  * npm packages, etc.). This function accumulates packages and vulnerabilities
  * across all Result objects without buffering the full output.
  *
- * Pipeline: source â†’ parser() â†’ pick(/^Results$/) â†’ streamArray()
+ * Pipeline: source -> parser() -> pick(/^Results$/) -> streamArray()
  */
 export async function parseTrivyOutput(source: Readable): Promise<ScanResult> {
   const packages: ScanResultPackage[] = [];
@@ -59,7 +59,7 @@ export async function parseTrivyOutput(source: Readable): Promise<ScanResult> {
   const pickFilter = createPick({ filter: /^Results$/ });
   const arrayStream = createStreamArray();
 
-  // Propagate errors through the pipeline â€” .pipe() does not forward errors.
+  // Propagate errors through the pipeline -- .pipe() does not forward errors.
   const destroyDownstream = (err: Error) => {
     pickFilter.destroy(err);
     arrayStream.destroy(err);

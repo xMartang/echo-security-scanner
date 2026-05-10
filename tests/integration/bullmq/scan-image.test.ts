@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Integration tests for the scan-image processor.
  *
  * Calls processScanJob() directly (no BullMQ sandbox) with a real Postgres
@@ -64,7 +64,7 @@ afterEach(async () => {
   mockScan.mockReset();
 });
 
-// â”€â”€ fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- fixtures "--------------------------------------------------------------------------------------------------------------------------------
 
 const SHARED_SCAN_RESULT = {
   packages: [{ name: 'openssl' }, { name: 'libssl' }],
@@ -85,7 +85,7 @@ const SHARED_SCAN_RESULT = {
   ],
 };
 
-// â”€â”€ basic processor tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- basic processor tests "--------------------------------------------------------------------------------------------------------
 
 describe('processScanJob', () => {
   it('marks image SUCCESS and returns cveCount on happy path', async () => {
@@ -116,11 +116,11 @@ describe('processScanJob', () => {
   });
 });
 
-// â”€â”€ concurrency stress test â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- concurrency stress test "----------------------------------------------------------------------------------------------------
 
 describe('concurrency stress: two parallel scans sharing CVEs and packages', () => {
   it('produces consistent row counts regardless of execution order', async () => {
-    // Both scans use the exact same CVEs and packages â€” idempotency under concurrency.
+    // Both scans use the exact same CVEs and packages -- idempotency under concurrency.
     mockScan
       .mockResolvedValueOnce({ result: SHARED_SCAN_RESULT, stderr: '' })
       .mockResolvedValueOnce({ result: SHARED_SCAN_RESULT, stderr: '' });
@@ -148,7 +148,7 @@ describe('concurrency stress: two parallel scans sharing CVEs and packages', () 
 
     // Each successful scan creates imgPkg + imgVuln rows.
     // With retries, both should eventually succeed (4 each) but we tolerate
-    // partial success (â‰¥2 each) in case one hits a non-retriable error.
+    // partial success (%o-2 each) in case one hits a non-retriable error.
     expect(imgPkgCount).toBeGreaterThanOrEqual(2);
     expect(imgVulnCount).toBeGreaterThanOrEqual(2);
   });

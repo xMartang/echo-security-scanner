@@ -1,8 +1,8 @@
-﻿/**
- * BullMQ entrypoint â€” boots the scan worker, scheduler, and graceful shutdown.
+/**
+ * BullMQ entrypoint -- boots the scan worker, scheduler, and graceful shutdown.
  *
  * Expected env vars (inherited from process.env / docker-compose environment):
- *   SERVICE_NAME=bullmq  DATABASE_URL  REDIS_URL  TRIVY_SERVER_URL  â€¦
+ *   SERVICE_NAME=bullmq  DATABASE_URL  REDIS_URL  TRIVY_SERVER_URL  ...
  */
 
 import 'dotenv/config';
@@ -21,19 +21,19 @@ const logger = createLogger({
   level: env.LOG_LEVEL,
 });
 
-// â”€â”€ Unhandled error guards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- Unhandled error guards "------------------------------------------------------------------------------------------------------
 
 process.on('unhandledRejection', (reason) => {
-  logger.fatal({ err: reason }, 'unhandled rejection â€” exiting');
+  logger.fatal({ err: reason }, 'unhandled rejection -- exiting');
   process.exit(1);
 });
 
 process.on('uncaughtException', (err) => {
-  logger.fatal({ err }, 'uncaught exception â€” exiting');
+  logger.fatal({ err }, 'uncaught exception -- exiting');
   process.exit(1);
 });
 
-// â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- Main "----------------------------------------------------------------------------------------------------------------------------------------
 
 async function main() {
   logger.info('bullmq entrypoint starting');
@@ -52,7 +52,7 @@ async function main() {
   const [tickWorker, hygieneWorker] = await setupScheduler(schedulerQueue, scanQueue, connection);
   logger.info({ intervalMs: env.SCAN_INTERVAL_MS }, 'scheduler started');
 
-  // â”€â”€ Graceful shutdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // "-- Graceful shutdown "------------------------------------------------------------------------------------------------------------
 
   async function shutdown(signal: string): Promise<void> {
     logger.info({ signal }, 'shutdown signal received, draining bullmq');

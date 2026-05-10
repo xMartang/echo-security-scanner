@@ -1,4 +1,4 @@
-﻿import { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 const MAX_BACKOFF_DELAY_MS: number = 10_000; // Cap backoff at 10 seconds to avoid excessively long waits
 
@@ -33,7 +33,7 @@ function isRetriable(err: unknown): err is Prisma.PrismaClientKnownRequestError 
  * errors (see RETRIABLE_CODES above).
  *
  * Backoff: `baseDelayMs * 2^attempt * uniform(0.75, 1.25)` -- exponential with
- * ±25% jitter so concurrent workers don't all retry at the same instant.
+ * +/-25% jitter so concurrent workers don't all retry at the same instant.
  *
  * All other errors propagate immediately without retry.
  */

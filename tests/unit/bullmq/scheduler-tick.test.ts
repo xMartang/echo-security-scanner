@@ -1,4 +1,4 @@
-﻿import { jest } from '@jest/globals';
+import { jest } from '@jest/globals';
 import type { Queue, Job } from 'bullmq';
 import type { SchedulerTickJobData } from '@/bullmq/types/job-payload.js';
 
@@ -15,7 +15,7 @@ const { buildScanJobs, enqueueScanJobs, processSchedulerTick } =
   await import('@/bullmq/tasks/scanners/trivy/scheduler-tick.job.js');
 const { IMAGES } = await import('@/bullmq/tasks/scanners/trivy/images.js');
 
-// â”€â”€ buildScanJobs (pure function â€” no mocks needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- buildScanJobs (pure function -- no mocks needed) "----------------------------------------------------
 
 describe('buildScanJobs', () => {
   const TRIGGERED_AT = '2026-05-10T00:00:00.000Z';
@@ -30,7 +30,7 @@ describe('buildScanJobs', () => {
     }
   });
 
-  it('jobId encodes imageName, imageTag, and triggeredAt (no colons â€” BullMQ v5)', () => {
+  it('jobId encodes imageName, imageTag, and triggeredAt (no colons -- BullMQ v5)', () => {
     for (const job of buildScanJobs(IMAGES, TRIGGERED_AT)) {
       const sanitizedAt = TRIGGERED_AT.replace(/:/g, '');
       const expected = `scan__${job.data.imageName}__${job.data.imageTag}__${sanitizedAt}`;
@@ -57,7 +57,7 @@ describe('buildScanJobs', () => {
   });
 });
 
-// â”€â”€ enqueueScanJobs (injectable queue â€” dedup via getJobs) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// "-- enqueueScanJobs (injectable queue -- dedup via getJobs) "--------------------------------------
 
 describe('enqueueScanJobs', () => {
   it('enqueues all images when none are in-flight', async () => {
@@ -102,7 +102,7 @@ describe('enqueueScanJobs', () => {
   });
 });
 
-// â”€â”€ processSchedulerTick (uses module-level scanQueue via singleton mock) â”€â”€â”€â”€â”€
+// "-- processSchedulerTick (uses module-level scanQueue via singleton mock) "--------
 
 describe('processSchedulerTick', () => {
   beforeEach(() => {

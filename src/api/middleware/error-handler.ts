@@ -1,4 +1,4 @@
-﻿import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
+import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import type pino from 'pino';
 import { ImageNotFoundError, ValidationError } from '@/common/utils/errors.js';
 

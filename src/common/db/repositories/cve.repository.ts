@@ -1,4 +1,4 @@
-﻿import type { PrismaClient, Severity } from '@prisma/client';
+import type { PrismaClient, Severity } from '@prisma/client';
 import { prisma } from '@/common/db/client.js';
 import { ImageNotFoundError } from '@/common/utils/errors.js';
 
