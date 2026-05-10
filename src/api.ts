@@ -42,18 +42,19 @@ const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, 'api listening');
 });
 
-// Hard-kill safety net — unref so it doesn't block the event loop normally.
-const hardKillTimer = setTimeout(() => {
-  logger.fatal('forced exit: api shutdown timed out after 20 s');
-  process.exit(1);
-}, 20_000).unref();
-
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
 
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'shutdown signal received, draining api');
 
-  // Stop accepting new connections; finish in-flight requests or timeout after 15 s.
+  // Hard-kill safety net: started AFTER SIGTERM, not at startup.
+  // .unref() so it does not prevent the event loop from exiting naturally.
+  const hardKillTimer = setTimeout(() => {
+    logger.fatal('forced exit: api shutdown timed out after 20 s');
+    process.exit(1);
+  }, 20_000).unref();
+
+  // Stop accepting new connections; let in-flight requests finish (15 s cap).
   await new Promise<void>((resolve) => {
     const timeout = setTimeout(resolve, 15_000);
     server.close(() => {

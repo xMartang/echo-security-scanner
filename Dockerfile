@@ -12,9 +12,13 @@ ENV HUSKY=0
 RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+# Schema is needed so prisma generate can create the typed client after install
+COPY prisma ./prisma
 
-# Install prod deps only — no devDependencies.
-RUN pnpm install --frozen-lockfile --prod
+# Install prod deps only — no devDependencies — then generate the Prisma client.
+# generate must happen here so the typed client is in the prod node_modules that
+# get copied into api-runtime and bullmq-runtime.
+RUN pnpm install --frozen-lockfile --prod && pnpm exec prisma generate
 
 # ── Stage 2: build ────────────────────────────────────────────────────────────
 # Compile TypeScript to dist/ and rewrite @/ path aliases.
@@ -69,4 +73,4 @@ COPY --from=aquasec/trivy:0.70.0 /usr/local/bin/trivy /usr/local/bin/trivy
 RUN trivy --version
 USER nodeapp
 
-CMD ["node", "dist/bullmq.js"]
+CMD ["node", "dist/worker.js"]

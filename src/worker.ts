@@ -37,13 +37,6 @@ process.on('uncaughtException', (err) => {
 async function main() {
   logger.info('bullmq entrypoint starting');
 
-  // Hard-kill safety net: if graceful shutdown hangs past 25 s, force exit.
-  // .unref() so this timer doesn't keep the event loop alive during normal operation.
-  const hardKillTimer = setTimeout(() => {
-    logger.fatal('forced exit: shutdown timed out after 25 s');
-    process.exit(1);
-  }, 25_000).unref();
-
   // Recover images left in SCANNING state by a previous crashed worker.
   const recoveredCount = await imageRepository.markStuckScanningAsFailed();
   if (recoveredCount > 0) {
@@ -63,6 +56,12 @@ async function main() {
   async function shutdown(signal: string): Promise<void> {
     logger.info({ signal }, 'shutdown signal received, draining bullmq');
 
+    // Hard-kill safety net: started AFTER SIGTERM, not at startup.
+    const hardKillTimer = setTimeout(() => {
+      logger.fatal('forced exit: shutdown timed out after 25 s');
+      process.exit(1);
+    }, 25_000).unref();
+
     try {
       await scanQueue.close();
       await schedulerQueue.close();
@@ -81,7 +80,6 @@ async function main() {
     }
 
     logger.info('bullmq shutdown complete');
-    // Flush pino's transport worker thread before exiting.
     logger.flush?.();
     await new Promise<void>((resolve) => setTimeout(resolve, 200));
 
