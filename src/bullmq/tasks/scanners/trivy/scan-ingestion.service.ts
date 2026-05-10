@@ -172,7 +172,7 @@ export async function ingestScanResults(
 
     logger.debug({ image: imageRef }, 'ingestion committed successfully');
   } catch (err) {
-    logger.error({ err, image: imageRef }, 'ingestion failed -- transaction rolled back');
+    logger.error({ image: imageRef, err }, 'ingestion failed -- transaction rolled back');
     throw err;
   }
 }

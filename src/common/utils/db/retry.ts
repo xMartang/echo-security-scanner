@@ -18,8 +18,15 @@ export type DBRetryOptions = {
  *
  *  P2024 -- Connection pool timeout. The pool was exhausted; a brief pause
  *          and retry often succeeds once an in-flight query finishes.
+ *
+ *  P2002 -- Unique constraint violated. Happens when two concurrent scan jobs
+ *          race to INSERT the same Package row (e.g. 'libssl' shared by
+ *          postgres:12 and mysql:8.0). On retry the row already exists so the
+ *          upsert takes the UPDATE branch -- no conflict. This is safe because
+ *          Package rows are content-addressed by name: any writer produces the
+ *          same row, so whichever wins the INSERT race is correct.
  */
-const RETRIABLE_CODES = new Set(['P2034', 'P2024']);
+const RETRIABLE_CODES = new Set(['P2034', 'P2024', 'P2002']);
 
 function isRetriable(err: unknown): err is Prisma.PrismaClientKnownRequestError {
   return (

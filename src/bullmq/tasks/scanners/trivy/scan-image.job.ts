@@ -32,10 +32,10 @@ function getSharedPrisma(): PrismaClient {
 }
 
 // Sandboxed processors run in child processes separate from the main bullmq
-// process. Using 'trivy-scanner' routes logs to trivy-scanner.*.log,
+// process. Using SERVICE_NAME + '-scan' routes logs to scan-processor.*.log,
 // avoiding concurrent multi-process writes to the same rotating log file.
 const logger = createLogger({
-  serviceName: 'trivy-scanner',
+  serviceName: `${env.SERVICE_NAME}-scan`,
   dir: env.LOG_DIR,
   level: env.LOG_LEVEL,
 });
@@ -83,7 +83,7 @@ export async function processScanJob(
     return { cveCount: result.vulnerabilities.length };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    logger.error({ err, image: imageRef }, 'scan failed');
+    logger.error({ image: imageRef, err }, 'scan failed');
     await repo.markFailed(image.id, errorMessage);
     return { cveCount: 0 };
   }
