@@ -1,6 +1,9 @@
-# ── Stage 1: deps ─────────────────────────────────────────────────────────────
-# Install production-only node_modules. This layer is cached separately from
-# the build layer so source changes don't reinstall deps.
+# syntax=docker/dockerfile:1
+
+# ── Shared stages (keep in sync with src/scanner/Dockerfile) ─────────────────
+# Both Dockerfiles repeat these stages; Docker BuildKit layer caching ensures
+# no duplicated work when both are built from the same context.
+
 FROM node:24.15.0-alpine AS deps
 
 WORKDIR /app
@@ -17,11 +20,9 @@ COPY prisma ./prisma
 
 # Install prod deps only — no devDependencies — then generate the Prisma client.
 # generate must happen here so the typed client is in the prod node_modules that
-# get copied into api-runtime and bullmq-runtime.
+# get copied into the runtime stage.
 RUN pnpm install --frozen-lockfile --prod && pnpm exec prisma generate
 
-# ── Stage 2: build ────────────────────────────────────────────────────────────
-# Compile TypeScript to dist/ and rewrite @/ path aliases.
 FROM node:24.15.0-alpine AS build
 
 WORKDIR /app
@@ -39,7 +40,7 @@ COPY src ./src
 # Generate Prisma client, compile TypeScript, rewrite path aliases
 RUN pnpm exec prisma generate && pnpm run build
 
-# ── Stage 3: api-runtime ──────────────────────────────────────────────────────
+# ── API-specific runtime ───────────────────────────────────────────────────────
 # Minimal runtime image for the Express API.
 # No source, no tests, no devDependencies, no Trivy binary.
 FROM node:24.15.0-alpine AS api-runtime
@@ -60,17 +61,4 @@ EXPOSE 3000
 
 # Run migrations then start the API.
 # prisma migrate deploy is idempotent — safe to run on every boot.
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/api.js"]
-
-# ── Stage 4: bullmq-runtime ───────────────────────────────────────────────────
-# Extends api-runtime with the Trivy CLI binary so the sandboxed processor
-# can invoke `trivy image --server ...` without a full Trivy installation.
-FROM api-runtime AS bullmq-runtime
-
-# Switch to root temporarily to install trivy, then drop back to nodeapp
-USER root
-COPY --from=aquasec/trivy:0.70.0 /usr/local/bin/trivy /usr/local/bin/trivy
-RUN trivy --version
-USER nodeapp
-
-CMD ["node", "dist/worker.js"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/api/index.js"]
