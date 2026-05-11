@@ -35,11 +35,19 @@ export async function parseScanOutputStream(stream: Readable): Promise<ScanResul
  */
 export async function scan(imageName: string, imageTag: string): Promise<ScanOutput> {
   const imageRef = `${imageName}:${imageTag}`;
-  const args = ['image', '--server', env.TRIVY_SERVER_URL, '--format', 'json', '--quiet', imageRef];
+  const args = ['image', '--server', env.TRIVY_SERVER_URL, '--scanners', 'vuln', '--format', 'json', '--quiet', imageRef];
 
   logger.debug({ cmd: `trivy ${args.join(' ')}` }, 'executing trivy scan');
 
   const trivyProcess = execa('trivy', args, { stdout: 'pipe', stderr: 'pipe' });
+
+  // Buffer stderr independently so it survives even if the parse promise rejects first.
+  // Without this, Promise.all races: parse error fires → catch runs → trivyProcess.stderr
+  // never resolves → real Trivy error message is permanently lost.
+  let stderrBuffer = '';
+  trivyProcess.stderr?.on('data', (chunk: Buffer) => {
+    stderrBuffer += chunk.toString('utf8');
+  });
 
   try {
     // Parse stdout while the process is still running.
@@ -60,6 +68,9 @@ export async function scan(imageName: string, imageTag: string): Promise<ScanOut
 
     return { result: scanResult, stderr: processExecution.stderr ?? '' };
   } catch (err) {
+    if (stderrBuffer) {
+      logger.error({ image: imageRef, trivyStderr: stderrBuffer }, 'trivy stderr on failure');
+    }
     throw new ScanFailedError(
       imageName,
       imageTag,

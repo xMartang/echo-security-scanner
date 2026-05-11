@@ -13,6 +13,7 @@
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --forceExit --runInBand",
     "lint": "eslint src tests --no-error-on-unmatched-pattern",
     "typecheck": "tsc --noEmit",
+    "pull-images": "tsx scripts/pull-scan-images.ts",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prepare": "node -e \"if(process.env.HUSKY==='0'||process.env.CI)process.exit(0)\" && husky || true"
