@@ -64,7 +64,7 @@ Never delete and re-insert scan results; always upsert to preserve history and a
 ## Source Layout
 - BullMQ infrastructure (queue, worker, scheduler) lives in `src/bullmq/`.
 - Trivy-specific task logic lives in `src/bullmq/tasks/scanners/trivy/`.
-- Hygiene task lives in `src/bullmq/tasks/hygiene/`.
+- Stale-vuln-cleanup task lives in `src/bullmq/tasks/stale-vuln-cleanup/`.
 - API services (HealthService) live in `src/api/services/`.
 - Shared code (DB client, repositories, logger, errors) lives in `src/common/`.
 - The `TaskConfig` interface at `src/bullmq/tasks/task.types.ts` is the contract new tasks must satisfy.

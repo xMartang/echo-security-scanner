@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { Worker } from 'bullmq';
 import type { ConnectionOptions } from 'bullmq';
 import { IMAGES } from '@/bullmq/tasks/scanners/images.js';
+import { SCAN_QUEUE_NAME } from '@/bullmq/tasks/scanners/trivy/consts.js';
 
 /**
  * Sandboxed concurrency cap:
@@ -33,5 +34,5 @@ const processorPath = fileURLToPath(
  */
 export function createScanWorker(connection: ConnectionOptions): Worker {
   const concurrency = calculateConcurrency(IMAGES.length, os.availableParallelism());
-  return new Worker('image-scan', processorPath, { connection, concurrency });
+  return new Worker(SCAN_QUEUE_NAME, processorPath, { connection, concurrency });
 }

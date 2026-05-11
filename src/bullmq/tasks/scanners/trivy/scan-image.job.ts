@@ -18,6 +18,7 @@ import { createLogger } from '@/common/utils/log/logger.js';
 import { createImageRepository } from '@/common/db/repositories/image.repository.js';
 import { ingestScanResults } from '@/bullmq/tasks/scanners/trivy/scan-ingestion.service.js';
 import { scan } from '@/bullmq/tasks/scanners/trivy/scanner.service.js';
+import { LOGGER_SERVICE_NAME } from '@/bullmq/tasks/scanners/trivy/consts.js';
 import { retryOnDBError } from '@/common/utils/db/retry.js';
 
 // -- Lazy singletons --
@@ -34,7 +35,7 @@ function getSharedPrisma(): PrismaClient {
 // Sandboxed processors run in child processes separate from the main bullmq
 // process.
 const logger = createLogger({
-  serviceName: 'trivy-scanner',
+  serviceName: LOGGER_SERVICE_NAME,
   dir: env.LOG_DIR,
   level: env.LOG_LEVEL,
 });

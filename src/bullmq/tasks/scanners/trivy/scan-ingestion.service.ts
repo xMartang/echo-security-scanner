@@ -16,12 +16,13 @@ import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result
 import { prisma } from '@/common/db/client.js';
 import { env } from '@/bullmq/config/env.js';
 import { createLogger } from '@/common/utils/log/logger.js';
+import { LOGGER_SERVICE_NAME } from '@/bullmq/tasks/scanners/trivy/consts.js';
 
 // Runs inside the sandboxed scan processor (child process), so each concurrent
 // job gets its own logger instance writing to trivy-scanner.*.log -- separate
 // from the main bullmq process logs to avoid multi-process rotation conflicts.
 const logger = createLogger({
-  serviceName: 'trivy-scanner',
+  serviceName: LOGGER_SERVICE_NAME,
   dir: env.LOG_DIR,
   level: env.LOG_LEVEL,
 });

@@ -6,6 +6,7 @@
 
 import 'dotenv/config';
 import { env } from '@/api/config/env.js';
+import { FLUSH_WAIT_MS } from '@/common/consts.js';
 import { createLogger } from '@/common/utils/log/logger.js';
 import { prisma } from '@/common/db/client.js';
 import { createApp } from '@/api/app.js';
@@ -13,7 +14,6 @@ import { createApp } from '@/api/app.js';
 // Shutdown timing constants (internal -- not operator-configurable).
 const HARD_KILL_TIMEOUT_MS = 20_000; // force-exit if graceful shutdown hangs
 const SERVER_CLOSE_TIMEOUT_MS = 15_000; // max time to drain in-flight HTTP requests
-const FLUSH_WAIT_MS = 200; // brief pause so the log transport flushes to disk
 
 const logger = createLogger({
   serviceName: env.SERVICE_NAME,

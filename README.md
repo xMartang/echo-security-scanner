@@ -15,7 +15,7 @@ A background service that periodically scans 10 fixed container images for CVE v
          | (read)                               |
          v                            +---------+---------+
    PostgreSQL :5432 <--- (write) ---  |  BullMQ service  |
-                                      |  (scan + hygiene) |
+                                      |  (scan + cleanup) |
                         Redis :6379 --+                   |
                                       +-------------------+
 ```
@@ -25,7 +25,7 @@ The system is split into two independently deployable services:
 - **API service** (`src/api/`): serves the REST endpoints with read-only DB queries. Has no knowledge of Redis, BullMQ, or Trivy.
 - **BullMQ service** (`src/bullmq/`): general-purpose task runner. Currently runs two tasks:
   - **Trivy scanner** (`tasks/scanners/trivy/`): scans images on a configurable interval; each image is a separate sandboxed job. Writes results to PostgreSQL.
-  - **Hygiene job** (`tasks/hygiene/`): runs weekly and hard-deletes `ImageVulnerability` rows older than 30 days (see [CVE staleness](#cve-staleness) below).
+  - **Stale-vuln-cleanup job** (`tasks/stale-vuln-cleanup/`): runs weekly and hard-deletes `ImageVulnerability` rows older than 30 days (see [CVE staleness](#cve-staleness) below).
 - **Trivy server**: runs in server mode; the BullMQ worker calls `trivy image --server` (no Docker socket needed on the worker).
 - **PostgreSQL** + **Prisma**: stores images, CVEs, packages, and join tables. The database is the only contract between API and BullMQ.
 - **Redis**: BullMQ job queue and scheduler backend (BullMQ service only).
@@ -252,7 +252,7 @@ Each service writes logs to its own subfolder under `./logs/`. Level files recei
 | `logs/api/api.debug.log.1` | Previous rotated file (older = higher number) |
 | `logs/api/api.info.log` | Info, warn, error, fatal |
 | `logs/api/api.error.log` | Error and fatal only |
-| `logs/bullmq/bullmq.debug.log` | BullMQ main process: scheduler ticks, hygiene job, startup/shutdown |
+| `logs/bullmq/bullmq.debug.log` | BullMQ main process: scheduler ticks, stale-vuln-cleanup job, startup/shutdown |
 | `logs/bullmq/trivy-scanner.debug.log` | Sandboxed scan processors: per-image scan results, ingestion steps |
 | `logs/postgres/postgres-YYYY-MM-DD.log` | Postgres server logs |
 | `logs/redis/redis.log` | Redis server logs |
@@ -262,7 +262,7 @@ Each service writes logs to its own subfolder under `./logs/`. Level files recei
 # Stream info logs from the API (no suffix = current file)
 tail -f logs/api/api.info.log | jq
 
-# Stream all BullMQ records (scheduler ticks, hygiene, startup)
+# Stream all BullMQ records (scheduler ticks, stale-vuln-cleanup, startup)
 tail -f logs/bullmq/bullmq.debug.log | jq .msg
 
 # Stream per-image scan progress and results
@@ -356,7 +356,7 @@ The scanner uses an upsert-only persistence approach -- it never deletes CVE rec
 
 Stale rows are preserved in the database as audit data -- `firstSeenAt` records when a CVE was first detected, and `lastSeenAt` records when it was last confirmed. This is useful for understanding exposure windows.
 
-**Weekly hygiene job:** a separate BullMQ repeatable job runs every 7 days and hard-deletes `ImageVulnerability` rows where `lastSeenAt < now() - 30 days`. This is purely operational -- preventing unbounded table growth. It does NOT affect the staleness logic above. Only `ImageVulnerability` rows are deleted; `Cve` and `Package` rows (reference data) are never touched.
+**Weekly stale-vuln-cleanup job:** a separate BullMQ repeatable job runs every 7 days and hard-deletes `ImageVulnerability` rows where `lastSeenAt < now() - 30 days`. This is purely operational -- preventing unbounded table growth. It does NOT affect the staleness logic above. Only `ImageVulnerability` rows are deleted; `Cve` and `Package` rows (reference data) are never touched.
 
 ---
 
@@ -371,7 +371,7 @@ Tasks live under `src/bullmq/tasks/`. Each task module exports a `TaskConfig` (s
 4. Import it in `src/bullmq/services/scheduler.service.ts` and add a `upsertJobScheduler` + `Worker` registration
 
 **To add an unrelated background task** (e.g. report generation):
-1. Create `src/bullmq/tasks/<name>/` alongside `hygiene/`
+1. Create `src/bullmq/tasks/<name>/` alongside `stale-vuln-cleanup/`
 2. Implement the processor function
 3. Export a `TaskConfig` from `index.ts`
 4. Register it in `scheduler.service.ts`

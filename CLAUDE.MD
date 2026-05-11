@@ -55,8 +55,8 @@ src/
           scanner.service.ts
           persistence.service.ts
           scheduler-tick.job.ts
-      hygiene/              # Weekly storage hygiene task (unrelated to scanning)
-        index.ts            # Exports hygieneTaskConfig: TaskConfig
+      stale-vuln-cleanup/   # Weekly stale-vulnerability cleanup task (unrelated to scanning)
+        index.ts            # Exports staleVulnCleanupTaskConfig: TaskConfig
         prune-stale-vulnerabilities.job.ts
 prisma/
   schema.prisma

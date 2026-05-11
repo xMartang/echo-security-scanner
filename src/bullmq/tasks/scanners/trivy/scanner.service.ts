@@ -3,11 +3,12 @@ import type { Readable } from 'node:stream';
 import { env } from '@/bullmq/config/env.js';
 import { createLogger } from '@/common/utils/log/logger.js';
 import { ScanFailedError } from '@/common/utils/errors.js';
+import { LOGGER_SERVICE_NAME } from '@/bullmq/tasks/scanners/trivy/consts.js';
 import { parseTrivyOutput } from '@/bullmq/tasks/scanners/trivy/utils/json-stream.js';
 import type { ScanResult } from '@/bullmq/tasks/scanners/trivy/types/scan-result.js';
 
 const logger = createLogger({
-  serviceName: 'trivy-scanner',
+  serviceName: LOGGER_SERVICE_NAME,
   dir: env.LOG_DIR,
   level: env.LOG_LEVEL,
 });

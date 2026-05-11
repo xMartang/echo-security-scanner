@@ -7,18 +7,19 @@
 
 import 'dotenv/config';
 import { env } from '@/bullmq/config/env.js';
+import { FLUSH_WAIT_MS } from '@/common/consts.js';
 import { createLogger } from '@/common/utils/log/logger.js';
 import { prisma } from '@/common/db/client.js';
 import { imageRepository } from '@/common/db/repositories/image.repository.js';
 import { connection } from '@/bullmq/connection.js';
 import { scanQueue, schedulerQueue } from '@/bullmq/tasks/scanners/trivy/queues.js';
 import { createScanWorker } from '@/bullmq/tasks/scanners/trivy/worker.js';
+import { SCAN_QUEUE_NAME, SCHEDULER_QUEUE_NAME } from '@/bullmq/tasks/scanners/trivy/consts.js';
 import { setupScheduler } from '@/bullmq/services/scheduler.service.js';
 
 // Shutdown timing constants (internal -- not operator-configurable).
 const HARD_KILL_TIMEOUT_MS = 25_000; // force-exit if graceful shutdown hangs
 const SCAN_WORKER_DRAIN_TIMEOUT_MS = 20_000; // max time to let in-flight scans finish
-const FLUSH_WAIT_MS = 200; // brief pause so the log transport flushes to disk
 
 const logger = createLogger({
   serviceName: env.SERVICE_NAME,
@@ -45,12 +46,12 @@ async function main() {
     logger.warn({ recoveredCount }, 'marked stuck SCANNING images as FAILED');
   }
 
-  logger.debug({ queue: 'image-scan' }, 'setting up sandboxed scan worker');
+  logger.debug({ queue: SCAN_QUEUE_NAME }, 'setting up sandboxed scan worker');
   const scanWorker = createScanWorker(connection);
-  logger.info({ queue: 'image-scan', concurrency: scanWorker.concurrency }, 'scan worker ready');
+  logger.info({ queue: SCAN_QUEUE_NAME, concurrency: scanWorker.concurrency }, 'scan worker ready');
 
-  logger.debug({ schedulerQueue: 'image-scheduler', scanQueue: 'image-scan' }, 'setting up scheduler and hygiene worker');
-  const [tickWorker, hygieneWorker] = await setupScheduler(schedulerQueue, scanQueue, connection);
+  logger.debug({ schedulerQueue: SCHEDULER_QUEUE_NAME, scanQueue: SCAN_QUEUE_NAME }, 'setting up scheduler and stale-vuln-cleanup worker');
+  const [tickWorker, staleVulnCleanupWorker] = await setupScheduler(schedulerQueue, scanQueue, connection);
   logger.info({ intervalMs: env.SCAN_INTERVAL_MS }, 'scheduler ready');
 
   async function shutdown(signal: string): Promise<void> {
@@ -76,8 +77,8 @@ async function main() {
       logger.debug('closing scheduler tick worker');
       await tickWorker.close();
 
-      logger.debug('closing hygiene worker');
-      await hygieneWorker.close();
+      logger.debug('closing stale-vuln-cleanup worker');
+      await staleVulnCleanupWorker.close();
 
       logger.debug('disconnecting Prisma and Redis');
       await prisma.$disconnect();

@@ -6,7 +6,7 @@ const scannerEnvSchema = commonEnvSchema.extend({
   TRIVY_SERVER_URL: z.string().url('TRIVY_SERVER_URL must be a valid URL'),
   SCAN_INTERVAL_MS: z.coerce.number().int().positive().default(900_000),
   // ImageVulnerability rows not confirmed by any scan in this many days are deleted
-  // by the weekly hygiene job. Purely operational -- does not affect API responses.
+  // by the weekly stale-vuln-cleanup job. Purely operational -- does not affect API responses.
   VULNERABILITY_RETENTION_DAYS: z.coerce.number().int().min(7).positive().default(30),
 });
 

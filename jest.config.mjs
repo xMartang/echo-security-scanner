@@ -17,5 +17,6 @@ export default {
   },
   testMatch: ['<rootDir>/tests/**/*.test.ts'],
   collectCoverageFrom: ['src/**/*.ts'],
+  setupFiles: ['<rootDir>/tests/jest.env-setup.ts'],
   testTimeout: 30000,
 };
