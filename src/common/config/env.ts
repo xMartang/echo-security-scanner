@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 export const commonEnvSchema = z.object({
   DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('debug'),
   LOG_DIR: z.string().default('./logs/local'),
   SERVICE_NAME: z.string().min(1, 'SERVICE_NAME is required'),
 });
