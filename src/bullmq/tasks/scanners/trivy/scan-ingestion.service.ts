@@ -36,6 +36,8 @@ const logger = createLogger({
  *
  * The Image.status = SUCCESS update is part of the same transaction, so
  * it's impossible for a crash to leave new CVE rows with a stale status.
+ * 
+ * IMPORTANT: Caller should wrap this function with retryOnDBError to handle transient Postgres errors, unless the caller wants to handle them manually.
  */
 export async function ingestScanResults(
   imageName: string,
@@ -65,114 +67,109 @@ export async function ingestScanResults(
     'ingestion starting',
   );
 
-  try {
-    await db.$transaction(async (transaction_client) => {
-      // 1. Upsert Image -- establishes the FK anchor for all join tables.
-      const image = await transaction_client.image.upsert({
-        where: { name_tag: { name: imageName, tag: imageTag } },
-        create: { name: imageName, tag: imageTag },
-        update: {},
-      });
-
-      // 2. Upsert Packages (sorted by name).
-      const packageIdByName = new Map<string, number>();
-      for (const pkg of sortedPackages) {
-        const savedPackage = await transaction_client.package.upsert({
-          where: { name: pkg.name },
-          create: { name: pkg.name },
-          update: {},
-        });
-        packageIdByName.set(pkg.name, savedPackage.id);
-      }
-      logger.debug({ image: imageRef, count: sortedPackages.length }, 'packages upserted');
-
-      // 3. Upsert CVEs (sorted by cveId; update severity/description on each run
-      //    in case Trivy revises them in a subsequent database update).
-      const cveDbIdByCveId = new Map<string, number>();
-      for (const vulnerability of sortedVulns) {
-        if (cveDbIdByCveId.has(vulnerability.cveId)) continue;
-        const savedCve = await transaction_client.cve.upsert({
-          where: { cveId: vulnerability.cveId },
-          create: {
-            cveId: vulnerability.cveId,
-            severity: vulnerability.severity,
-            description: vulnerability.description,
-          },
-          update: {
-            severity: vulnerability.severity,
-            description: vulnerability.description,
-          },
-        });
-        cveDbIdByCveId.set(vulnerability.cveId, savedCve.id);
-      }
-      logger.debug({ image: imageRef, count: cveDbIdByCveId.size }, 'CVEs upserted');
-
-      // 4. Upsert ImagePackage join rows.
-      for (const pkg of sortedPackages) {
-        const packageId = packageIdByName.get(pkg.name);
-        if (packageId === undefined) continue;
-        await transaction_client.imagePackage.upsert({
-          where: { imageId_packageId: { imageId: image.id, packageId } },
-          create: { imageId: image.id, packageId },
-          update: {},
-        });
-      }
-      logger.debug({ image: imageRef, count: sortedPackages.length }, 'image-package links upserted');
-
-      // 5. Upsert ImageVulnerability join rows (sorted by (cveId, packageId)).
-      const sortedImageVulnKeys = sortedVulns
-        .map((vulnerability) => ({
-          vulnerability,
-          cveDbId: cveDbIdByCveId.get(vulnerability.cveId),
-          packageDbId: packageIdByName.get(vulnerability.packageName),
-        }))
-        .filter(
-          (entry): entry is { vulnerability: typeof sortedVulns[number]; cveDbId: number; packageDbId: number } =>
-            entry.cveDbId !== undefined && entry.packageDbId !== undefined,
-        )
-        .sort((a, b) => a.cveDbId - b.cveDbId || a.packageDbId - b.packageDbId);
-
-      for (const { vulnerability, cveDbId, packageDbId } of sortedImageVulnKeys) {
-        await transaction_client.imageVulnerability.upsert({
-          where: {
-            imageId_cveId_packageId: { imageId: image.id, cveId: cveDbId, packageId: packageDbId },
-          },
-          create: {
-            imageId: image.id,
-            cveId: cveDbId,
-            packageId: packageDbId,
-            installedVersion: vulnerability.installedVersion,
-            fixedVersion: vulnerability.fixedVersion,
-            firstSeenAt: scanCompletedAt,
-            lastSeenAt: scanCompletedAt,
-          },
-          update: {
-            installedVersion: vulnerability.installedVersion,
-            fixedVersion: vulnerability.fixedVersion,
-            // lastSeenAt always updated when CVE is confirmed by this scan.
-            // firstSeenAt is intentionally NOT updated -- records the original detection time.
-            lastSeenAt: scanCompletedAt,
-          },
-        });
-      }
-      logger.debug({ image: imageRef, count: sortedImageVulnKeys.length }, 'image-vulnerability links upserted');
-
-      // 6. Mark Image SUCCESS -- same transaction, so atomically committed with all upserts.
-      // lastScannedAt = scanCompletedAt so it exactly matches lastSeenAt set above,
-      // making the staleness filter (lastSeenAt >= lastScannedAt) precise.
-      await transaction_client.image.update({
-        where: { id: image.id },
-        data: {
-          status: ScanStatus.SUCCESS,
-          lastScannedAt: scanCompletedAt,
-          lastError: null,
-        },
-      });
+  await db.$transaction(async (transaction_client) => {
+    // 1. Upsert Image -- establishes the FK anchor for all join tables.
+    const image = await transaction_client.image.upsert({
+      where: { name_tag: { name: imageName, tag: imageTag } },
+      create: { name: imageName, tag: imageTag },
+      update: {},
     });
 
-    logger.debug({ image: imageRef }, 'ingestion committed successfully');
-  } catch (err) {
-    logger.error({ image: imageRef, err }, 'ingestion failed -- transaction rolled back');
-    throw err;
-  }
+    // 2. Upsert Packages (sorted by name).
+    const packageIdByName = new Map<string, number>();
+    for (const pkg of sortedPackages) {
+      const savedPackage = await transaction_client.package.upsert({
+        where: { name: pkg.name },
+        create: { name: pkg.name },
+        update: {},
+      });
+      packageIdByName.set(pkg.name, savedPackage.id);
+    }
+    logger.debug({ image: imageRef, count: sortedPackages.length }, 'packages upserted');
+
+    // 3. Upsert CVEs (sorted by cveId; update severity/description on each run
+    //    in case Trivy revises them in a subsequent database update).
+    const cveDbIdByCveId = new Map<string, number>();
+    for (const vulnerability of sortedVulns) {
+      if (cveDbIdByCveId.has(vulnerability.cveId)) continue;
+      const savedCve = await transaction_client.cve.upsert({
+        where: { cveId: vulnerability.cveId },
+        create: {
+          cveId: vulnerability.cveId,
+          severity: vulnerability.severity,
+          description: vulnerability.description,
+        },
+        update: {
+          severity: vulnerability.severity,
+          description: vulnerability.description,
+        },
+      });
+      cveDbIdByCveId.set(vulnerability.cveId, savedCve.id);
+    }
+    logger.debug({ image: imageRef, count: cveDbIdByCveId.size }, 'CVEs upserted');
+
+    // 4. Upsert ImagePackage join rows.
+    for (const pkg of sortedPackages) {
+      const packageId = packageIdByName.get(pkg.name);
+      if (packageId === undefined) continue;
+      await transaction_client.imagePackage.upsert({
+        where: { imageId_packageId: { imageId: image.id, packageId } },
+        create: { imageId: image.id, packageId },
+        update: {},
+      });
+    }
+    logger.debug({ image: imageRef, count: sortedPackages.length }, 'image-package links upserted');
+
+    // 5. Upsert ImageVulnerability join rows (sorted by (cveId, packageId)).
+    const sortedImageVulnKeys = sortedVulns
+      .map((vulnerability) => ({
+        vulnerability,
+        cveDbId: cveDbIdByCveId.get(vulnerability.cveId),
+        packageDbId: packageIdByName.get(vulnerability.packageName),
+      }))
+      .filter(
+        (entry): entry is { vulnerability: typeof sortedVulns[number]; cveDbId: number; packageDbId: number } =>
+          entry.cveDbId !== undefined && entry.packageDbId !== undefined,
+      )
+      .sort((a, b) => a.cveDbId - b.cveDbId || a.packageDbId - b.packageDbId);
+
+    for (const { vulnerability, cveDbId, packageDbId } of sortedImageVulnKeys) {
+      await transaction_client.imageVulnerability.upsert({
+        where: {
+          imageId_cveId_packageId: { imageId: image.id, cveId: cveDbId, packageId: packageDbId },
+        },
+        create: {
+          imageId: image.id,
+          cveId: cveDbId,
+          packageId: packageDbId,
+          installedVersion: vulnerability.installedVersion,
+          fixedVersion: vulnerability.fixedVersion,
+          firstSeenAt: scanCompletedAt,
+          lastSeenAt: scanCompletedAt,
+        },
+        update: {
+          installedVersion: vulnerability.installedVersion,
+          fixedVersion: vulnerability.fixedVersion,
+          // lastSeenAt always updated when CVE is confirmed by this scan.
+          // firstSeenAt is intentionally NOT updated -- records the original detection time.
+          lastSeenAt: scanCompletedAt,
+        },
+      });
+    }
+    logger.debug({ image: imageRef, count: sortedImageVulnKeys.length }, 'image-vulnerability links upserted');
+
+    // 6. Mark Image SUCCESS -- same transaction, so atomically committed with all upserts.
+    // lastScannedAt = scanCompletedAt so it exactly matches lastSeenAt set above,
+    // making the staleness filter (lastSeenAt >= lastScannedAt) precise.
+    await transaction_client.image.update({
+      where: { id: image.id },
+      data: {
+        status: ScanStatus.SUCCESS,
+        lastScannedAt: scanCompletedAt,
+        lastError: null,
+      },
+    });
+  });
+
+  logger.debug({ image: imageRef }, 'ingestion committed successfully');
 }
