@@ -16,5 +16,7 @@ export function parseEnv<T extends z.ZodTypeAny>(schema: T, rawEnv: NodeJS.Proce
     const errors = result.error.flatten().fieldErrors;
     throw new Error(`Invalid environment variables:\n${JSON.stringify(errors, null, 2)}`);
   }
-  return result.data;
+  // result.data is typed as `any` by zod when T is a generic ZodTypeAny;
+  // safe to assert because safeParse(success=true) guarantees the schema matched.
+  return result.data as z.infer<T>;
 }
