@@ -423,7 +423,9 @@ docker compose down -v
 
 ### Docker socket mounted on the bullmq container
 
-`docker-compose.yml` mounts `/var/run/docker.sock` into the `bullmq` container with `group_add: ["0"]` so the non-root `nodeapp` user can talk to the host Docker daemon. This is required because the Trivy client (running inside `bullmq`) inspects each target image locally to extract its package list before sending the list to the trivy server.
+`docker-compose.yml` mounts `/var/run/docker.sock` into the `bullmq` container and runs the service as `user: root` so the Trivy client can talk to the host Docker daemon regardless of which GID the host platform assigns to the socket. This is required because the Trivy client (running inside `bullmq`) inspects each target image locally to extract its package list before sending the list to the trivy server.
+
+> We previously used `group_add: ["0"]` on the non-root `nodeapp` user, but the socket GID inside the container varies across Docker Desktop on macOS, Docker Desktop on Windows, and rootless Linux, so `group_add` was not portable. `user: root` works everywhere.
 
 The trade-off: anything that can talk to the docker socket can effectively run as root on the host (start privileged containers, mount host paths, etc.). For a local dev / take-home setup this is acceptable; for production you would normally either:
 
@@ -431,7 +433,7 @@ The trade-off: anything that can talk to the docker socket can effectively run a
 - use a rootless docker context, or
 - isolate scanning in a dedicated VM / namespace.
 
-If you do not need local image caching, you can remove both the socket mount and `group_add: ["0"]` from the `bullmq` service; trivy will then pull every target image from Docker Hub on every scan tick and hit the unauthenticated rate limit (100 req / 6 h).
+If you do not need local image caching, you can remove both the socket mount and `user: root` from the `bullmq` service; trivy will then pull every target image from Docker Hub on every scan tick and hit the unauthenticated rate limit (100 req / 6 h).
 
 ---
 
