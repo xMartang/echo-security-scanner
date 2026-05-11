@@ -425,8 +425,6 @@ docker compose down -v
 
 `docker-compose.yml` mounts `/var/run/docker.sock` into the `bullmq` container. The container runs as root (the Dockerfile no longer sets a `USER` directive) so the Trivy client can talk to the host Docker daemon regardless of which GID the host platform assigns to the socket. This is required because the Trivy client (running inside `bullmq`) inspects each target image locally to extract its package list before sending the list to the trivy server.
 
-> Earlier iterations dropped to a non-root `nodeapp` user with `group_add: ["0"]`, but the socket GID inside the container varies across Docker Desktop on macOS, Docker Desktop on Windows, and rootless Linux, so `group_add` was not portable. Running as root matches the trivy-server service (which also runs as root by default) and works everywhere.
-
 The trade-off: anything that can talk to the docker socket can effectively run as root on the host (start privileged containers, mount host paths, etc.). For a local dev / take-home setup this is acceptable; for production you would normally either:
 
 - pre-build images and ship them via a private registry that trivy server can fetch directly, removing the need for the client to inspect images, or
