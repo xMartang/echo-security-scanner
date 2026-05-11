@@ -1,0 +1,52 @@
+{
+  "SchemaVersion": 2,
+  "ArtifactName": "nginx:1.19",
+  "ArtifactType": "container_image",
+  "Metadata": {
+    "OS": { "Family": "debian", "Name": "10.11" }
+  },
+  "Results": [
+    {
+      "Target": "nginx:1.19 (debian 10.11)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Packages": [
+        { "Name": "openssl", "Version": "1.1.1k-1+deb10u1" },
+        { "Name": "libssl1.1", "Version": "1.1.1k-1+deb10u1" }
+      ],
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2023-0001",
+          "PkgName": "openssl",
+          "InstalledVersion": "1.1.1k-1+deb10u1",
+          "FixedVersion": "1.1.1l-1+deb10u1",
+          "Severity": "CRITICAL",
+          "Title": "Critical OpenSSL vulnerability"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-0002",
+          "PkgName": "libssl1.1",
+          "InstalledVersion": "1.1.1k-1+deb10u1",
+          "Severity": "HIGH",
+          "Description": "High severity libssl bug"
+        }
+      ]
+    },
+    {
+      "Target": "usr/bin/nginx (gobinary)",
+      "Class": "lang-pkgs",
+      "Type": "gobinary",
+      "Packages": [
+        { "Name": "golang.org/x/net", "Version": "v0.0.1" }
+      ],
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2023-0003",
+          "PkgName": "golang.org/x/net",
+          "InstalledVersion": "v0.0.1",
+          "Severity": "MEDIUM"
+        }
+      ]
+    }
+  ]
+}

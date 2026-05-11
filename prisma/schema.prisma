@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ScanStatus {
+  PENDING
+  SCANNING
+  SUCCESS
+  FAILED
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  UNKNOWN
+}
+
+model Image {
+  id              Int                  @id @default(autoincrement())
+  name            String
+  tag             String
+  status          ScanStatus           @default(PENDING)
+  lastScannedAt   DateTime?
+  lastError       String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  packages        ImagePackage[]
+  vulnerabilities ImageVulnerability[]
+
+  @@unique([name, tag])
+  @@index([status])
+}
+
+model Package {
+  name            String               @unique
+  id              Int                  @id @default(autoincrement())
+  images          ImagePackage[]
+  vulnerabilities ImageVulnerability[]
+
+  @@index([name])
+}
+
+model Cve {
+  id              Int                  @id @default(autoincrement())
+  cveId           String               @unique
+  severity        Severity
+  description     String?
+  vulnerabilities ImageVulnerability[]
+
+  @@index([severity])
+  @@index([cveId])
+}
+
+model ImagePackage {
+  imageId   Int
+  packageId Int
+  image     Image   @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@id([imageId, packageId])
+}
+
+
+model ImageVulnerability {
+  imageId          Int
+  cveId            Int
+  packageId        Int
+  installedVersion String
+  fixedVersion     String?
+  /// Timestamp of the first scan that detected this CVE in this image. Immutable.
+  firstSeenAt      DateTime @default(now())
+  /// Updated to the scan timestamp every time this CVE is confirmed by the latest scan.
+  /// CVEs not updated in the latest scan are excluded from API responses via filter:
+  ///   lastSeenAt >= Image.lastScannedAt
+  lastSeenAt       DateTime @default(now())
+  image            Image   @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  cve              Cve     @relation(fields: [cveId], references: [id], onDelete: Cascade)
+  package          Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@id([imageId, cveId, packageId])
+  @@index([cveId])
+  @@index([packageId])
+  @@index([lastSeenAt])
+}

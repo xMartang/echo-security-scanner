@@ -1,0 +1,160 @@
+---
+# Shared logging configuration -- applied to every service via the x-logging anchor.
+# Caps stdout log disk usage to 5 x 10 MB per service.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    container_name: postgres
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./logs/postgres:/var/log/app
+    # Write logs to /var/log/app/postgres-YYYY-MM-DD.log on the host mount.
+    command: >
+      postgres
+        -c logging_collector=on
+        -c log_directory=/var/log/app
+        -c log_filename=postgres-%Y-%m-%d.log
+        -c log_min_messages=info
+        -c log_rotation_age=1d
+        -c log_rotation_size=100MB
+        -c log_truncate_on_rotation=on
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "scanner", "-d", "scanner"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+      - ./logs/redis:/var/log/app
+    # Pipe redis-server output through tee so logs appear both in
+    # `docker compose logs redis` (stdout) and in ./logs/redis.log on the host.
+    command: sh -c "redis-server --loglevel notice 2>&1 | tee /var/log/app/redis.log"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ── Trivy server ────────────────────────────────────────────────────────────
+  trivy-server:
+    container_name: trivy
+    image: aquasec/trivy:0.70.0
+    restart: unless-stopped
+    logging: *default-logging
+    # Override entrypoint so the shell processes the pipe.
+    # tee writes to both stdout (docker compose logs trivy) and the host-mounted file.
+    entrypoint: ["sh", "-c"]
+    command: ["trivy server --listen 0.0.0.0:8080 2>&1 | tee /var/log/app/trivy.log"]
+    ports:
+      - "${TRIVY_PORT}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - trivy_cache:/root/.cache/
+      - ./logs/trivy:/var/log/app
+    healthcheck:
+      # On first boot Trivy downloads the vulnerability DB (~several hundred MB).
+      # start_period: 5m prevents Docker from marking it unhealthy during the download.
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5m
+
+  # ── API (Express) ───────────────────────────────────────────────────────────
+  api:
+    container_name: api
+    build:
+      context: .
+      dockerfile: src/api/Dockerfile
+      target: api-runtime
+    restart: unless-stopped
+    logging: *default-logging
+    stop_grace_period: 30s
+    env_file: .env
+    environment:
+      # Service-specific overrides -- cannot live in the shared .env file.
+      SERVICE_NAME: api
+      LOG_DIR: /var/log/app
+    ports:
+      - "${API_PORT}:${PORT}"
+    volumes:
+      - ./logs/api:/var/log/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── BullMQ worker ───────────────────────────────────────────────────────────
+  bullmq:
+    container_name: bullmq
+    build:
+      context: .
+      dockerfile: src/bullmq/Dockerfile
+      target: scanner-runtime
+    restart: unless-stopped
+    logging: *default-logging
+    stop_grace_period: 30s
+    env_file: .env
+    environment:
+      # Service-specific overrides -- cannot live in the shared .env file.
+      SERVICE_NAME: bullmq
+      LOG_DIR: /var/log/app
+    volumes:
+      # Trivy client/server: the SERVER holds the vuln DB; the CLIENT (bullmq's
+      # trivy binary) still inspects the image locally to extract package lists.
+      # Mounting the socket lets trivy use the host daemon when an image is cached
+      # locally, otherwise trivy pulls from Docker Hub directly. Optional helper:
+      # `node scripts/pull-scan-images.mjs` pre-pulls every target image so heavy scan ticks
+      # cannot exhaust the unauthenticated Docker Hub rate limit.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./logs/bullmq:/var/log/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      trivy-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  pg_data:
+  redis_data:
+  trivy_cache:
