@@ -11,10 +11,7 @@ const mockExeca = jest.fn<() => object>();
 jest.unstable_mockModule('execa', () => ({ execa: mockExeca }));
 
 // Dynamic import AFTER the mock is registered
-const [{ scan, parseScanOutputStream }, { ScanFailedError }] = await Promise.all([
-  import('@/bullmq/tasks/scanners/trivy/scanner.service.js'),
-  import('@/common/utils/errors.js'),
-]);
+const { scan, parseScanOutputStream } = await import('@/bullmq/tasks/scanners/trivy/scanner.service.js');
 
 // "-- parseScanOutputStream (no execa needed) "------------------------------------------------------------------
 
@@ -35,9 +32,11 @@ describe('scan', () => {
   it('returns ScanOutput on successful trivy exit', async () => {
     const json = await readFile(join(fixturesDir, 'trivy-sample.json'), 'utf-8');
     const mockStdout = Readable.from([json]);
-    const fakeProcess = Object.assign(Promise.resolve({ stderr: 'some warning' }), {
-      stdout: mockStdout,
-    });
+    const mockStderr = Readable.from(['some warning']);
+    const fakeProcess = Object.assign(
+      Promise.resolve({ exitCode: 0, stderr: 'some warning' }),
+      { stdout: mockStdout, stderr: mockStderr },
+    );
     mockExeca.mockReturnValue(fakeProcess);
 
     const output = await scan('nginx', '1.19');
@@ -45,14 +44,22 @@ describe('scan', () => {
     expect(output.stderr).toBe('some warning');
   });
 
-  it('throws ScanFailedError when trivy process rejects', async () => {
-    const execaError = new Error('exited with code 1: image not found');
+  it('throws ScanFailedError when trivy exits non-zero (rate limit / image not found)', async () => {
+    // Simulates the TOOMANYREQUESTS path: trivy writes a FATAL to stderr and
+    // closes stdout empty. The parse promise rejects with "expected a value",
+    // but our scan() should surface the stderr error, not the parser noise.
+    const fatalMessage = '2026-05-11T00:00:00Z\tFATAL\tFatal error\tTOOMANYREQUESTS';
     const emptyStdout = new Readable({ read() { this.push(null); } });
-    const failedProcess = Object.assign(Promise.reject(execaError), { stdout: emptyStdout });
-    // Attach handler so Jest doesn't see an unhandled rejection on the mock value
-    failedProcess.catch(() => undefined);
+    const mockStderr = Readable.from([fatalMessage]);
+    const failedProcess = Object.assign(
+      Promise.resolve({ exitCode: 1, stderr: fatalMessage }),
+      { stdout: emptyStdout, stderr: mockStderr },
+    );
     mockExeca.mockReturnValue(failedProcess);
 
-    await expect(scan('nonexistent', 'badtag')).rejects.toBeInstanceOf(ScanFailedError);
+    await expect(scan('nonexistent', 'badtag')).rejects.toMatchObject({
+      name: 'ScanFailedError',
+      cause: expect.objectContaining({ message: expect.stringContaining('TOOMANYREQUESTS') as unknown }) as unknown,
+    });
   });
 });

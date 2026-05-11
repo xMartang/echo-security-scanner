@@ -111,7 +111,7 @@ VULNERABILITY_RETENTION_DAYS  # default 30
 
 ## Infrastructure Commands
 - `docker compose up --build` — start the entire stack
-- `pnpm pull-images` — optional: pre-pull every scan target image into the host docker daemon (avoids Docker Hub rate limits)
+- `bash scripts/pull-scan-images.sh` — optional: pre-pull every scan target image into the host docker daemon (avoids Docker Hub rate limits)
 - `pnpm prisma:migrate` — run database migrations (`prisma migrate dev`)
 - `pnpm prisma:studio` — open Prisma Studio
 - `pnpm build` — compile TypeScript

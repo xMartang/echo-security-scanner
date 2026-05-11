@@ -141,7 +141,7 @@ services:
       # trivy binary) still inspects the image locally to extract package lists.
       # Mounting the socket lets trivy use the host daemon when an image is cached
       # locally, otherwise trivy pulls from Docker Hub directly. Optional helper:
-      # `pnpm pull-images` pre-pulls every target image so heavy scan ticks
+      # `bash scripts/pull-scan-images.sh` pre-pulls every target image so heavy scan ticks
       # cannot exhaust the unauthenticated Docker Hub rate limit.
       - /var/run/docker.sock:/var/run/docker.sock
       - ./logs/bullmq:/var/log/app

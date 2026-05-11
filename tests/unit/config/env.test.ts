@@ -20,7 +20,7 @@ describe('parseEnv', () => {
   it('parses valid env with required fields only', () => {
     const result = parseEnv(fullEnvSchema, validEnv);
     expect(result.PORT).toBe(3000);
-    expect(result.LOG_LEVEL).toBe('info');
+    expect(result.LOG_LEVEL).toBe('debug');
     expect(result.SCAN_INTERVAL_MS).toBe(900_000);
     expect(result.LOG_DIR).toBe('./logs/local');
     expect(result.SERVICE_NAME).toBe('test-api');

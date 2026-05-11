@@ -148,7 +148,7 @@ This is fine for a one-off run, but if the scheduler ticks many times before the
 You can avoid this by pre-pulling every target image into the host daemon once:
 
 ```bash
-pnpm pull-images
+bash scripts/pull-scan-images.sh
 ```
 
 Run this any time you change `src/bullmq/tasks/scanners/images.ts`. Images already present are skipped, so re-running is safe and cheap.
