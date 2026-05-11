@@ -43,24 +43,25 @@ RUN pnpm exec prisma generate && pnpm run build
 # -- Scanner-specific runtime --
 # Adds the Trivy CLI binary so the sandboxed scan processor can call
 # `trivy image --server ...` -- the API service has no need for Trivy.
+#
+# Runs as root, matching the trivy-server service. The bullmq container mounts
+# /var/run/docker.sock so the Trivy client can find pre-pulled images locally;
+# the socket's owner / group inside the container varies across Docker Desktop
+# on macOS, Docker Desktop on Windows, and rootless Linux, so dropping to a
+# non-root user requires platform-specific group_add gymnastics. Running as
+# root is documented as an accepted trade-off in README "Security trade-offs".
 FROM node:24.15.0-alpine AS scanner-runtime
 
 WORKDIR /app
 
-# Security: run as non-root, but switch to root temporarily to install Trivy
-RUN addgroup -g 1001 nodeapp && adduser -u 1001 -G nodeapp -D nodeapp
-USER root
-
 COPY --from=aquasec/trivy:0.70.0 /usr/local/bin/trivy /usr/local/bin/trivy
 RUN trivy --version
 
-USER nodeapp
-
 # Copy only what the runtime needs
-COPY --from=deps   --chown=nodeapp:nodeapp /app/node_modules ./node_modules
-COPY --from=build  --chown=nodeapp:nodeapp /app/dist         ./dist
-COPY --from=build  --chown=nodeapp:nodeapp /app/prisma       ./prisma
-COPY --chown=nodeapp:nodeapp package.json ./
-COPY --chown=nodeapp:nodeapp src/bullmq/healthcheck.mjs ./healthcheck.mjs
+COPY --from=deps   /app/node_modules ./node_modules
+COPY --from=build  /app/dist         ./dist
+COPY --from=build  /app/prisma       ./prisma
+COPY package.json ./
+COPY src/bullmq/healthcheck.mjs ./healthcheck.mjs
 
 CMD ["node", "dist/bullmq/index.js"]

@@ -131,12 +131,6 @@ services:
       # Service-specific overrides -- cannot live in the shared .env file.
       SERVICE_NAME: bullmq
       LOG_DIR: /var/log/app
-    # Run as root so trivy can talk to /var/run/docker.sock regardless of which
-    # GID the host platform assigns to the socket inside the container. macOS
-    # Docker Desktop, Windows Docker Desktop, and rootless Linux all use
-    # different mappings; `group_add: ["0"]` was not portable. See Security
-    # trade-offs in README.md.
-    user: root
     volumes:
       # Trivy client/server: the SERVER holds the vuln DB; the CLIENT (bullmq's
       # trivy binary) still inspects the image locally to extract package lists.
