@@ -237,7 +237,7 @@ curl -s "http://localhost:3000/api/cves?severity=CRITICAL" | jq '.data | length'
 All images affected by a specific CVE, including installed/fixed version details.
 
 ```bash
-curl -s "http://localhost:3000/api/cves/CVE-2021-44228/images" | jq '.data'
+curl -s "http://localhost:3000/api/cves/CVE-2026-7168/images" | jq '.data'
 ```
 
 ---

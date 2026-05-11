@@ -7,7 +7,7 @@ const scannerEnvSchema = commonEnvSchema.extend({
   SCAN_INTERVAL_MS: z.coerce.number().int().positive().default(900_000),
   // ImageVulnerability rows not confirmed by any scan in this many days are deleted
   // by the weekly hygiene job. Purely operational -- does not affect API responses.
-  VULNERABILITY_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+  VULNERABILITY_RETENTION_DAYS: z.coerce.number().int().min(7).positive().default(30),
 });
 
 export type ScannerEnv = z.infer<typeof scannerEnvSchema>;
