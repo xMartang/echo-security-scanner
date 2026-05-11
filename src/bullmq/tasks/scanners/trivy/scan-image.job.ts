@@ -32,10 +32,9 @@ function getSharedPrisma(): PrismaClient {
 }
 
 // Sandboxed processors run in child processes separate from the main bullmq
-// process. Using SERVICE_NAME + '-scan' routes logs to scan-processor.*.log,
-// avoiding concurrent multi-process writes to the same rotating log file.
+// process.
 const logger = createLogger({
-  serviceName: `${env.SERVICE_NAME}-scan`,
+  serviceName: 'trivy-scanner',
   dir: env.LOG_DIR,
   level: env.LOG_LEVEL,
 });
