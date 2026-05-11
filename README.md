@@ -374,7 +374,7 @@ The same suite (`pnpm lint && pnpm typecheck && pnpm test`) runs in GitHub Actio
 
 To trigger the workflow, add the `RUN_CI` label to your PR — the run kicks off immediately. Subsequent pushes to the same PR re-run the workflow automatically as long as the label is still attached.
 
-Branch protection on `main` requires the `ci / test` check to pass, so a PR with no `RUN_CI` label (or a failing check) cannot be merged.
+Branch protection on `main` requires the `test` check to pass, so a PR with no `RUN_CI` label (or a failing check) cannot be merged.
 
 ---
 
