@@ -34,39 +34,46 @@ The system is split into two independently deployable services:
 
 ## Database schema
 
-Three entities (`Image`, `Package`, `Cve`) connected by two join tables (`ImagePackage`, `ImageVulnerability`).
+```mermaid
+erDiagram
+    Image {
+        int id PK
+        string name
+        string tag
+        ScanStatus status
+        datetime lastScannedAt
+        string lastError
+    }
+    Package {
+        int id PK
+        string name
+    }
+    Cve {
+        int id PK
+        string cveId
+        Severity severity
+        string description
+    }
+    ImagePackage {
+        int imageId FK
+        int packageId FK
+    }
+    ImageVulnerability {
+        int imageId FK
+        int cveId FK
+        int packageId FK
+        string installedVersion
+        string fixedVersion
+        datetime firstSeenAt
+        datetime lastSeenAt
+    }
 
-### Relationships
-
+    Image ||--o{ ImagePackage : "contains"
+    Package ||--o{ ImagePackage : "found in"
+    Image ||--o{ ImageVulnerability : "has"
+    Cve ||--o{ ImageVulnerability : "affects"
+    Package ||--o{ ImageVulnerability : "via"
 ```
-       Image                                Package
-         |                                     |
-         |  ImagePackage    (imageId, packageId)
-         +-------------------------------------+
-         |
-         |  ImageVulnerability                  ┌────── Cve
-         +─── (imageId, cveId, packageId, ──────┤
-              installedVersion, fixedVersion,   └────── Package
-              firstSeenAt, lastSeenAt)
-```
-
-- `ImagePackage` links every image to the packages it ships.
-- `ImageVulnerability` links every image to the CVEs that affect it, naming the offending package and recording the installed and fixed versions plus first/last detection timestamps.
-
-### Entities
-
-| Table   | Columns |
-|---------|---------|
-| `Image`   | `id`, `name`, `tag`, `status` (`ScanStatus`), `lastScannedAt`, `lastError`, `createdAt`, `updatedAt` |
-| `Package` | `id`, `name` |
-| `Cve`     | `id`, `cveId`, `severity` (`Severity`), `description` |
-
-### Join tables
-
-| Table                  | Composite PK                  | Extra columns |
-|------------------------|-------------------------------|---------------|
-| `ImagePackage`         | `(imageId, packageId)`         | — |
-| `ImageVulnerability`   | `(imageId, cveId, packageId)`  | `installedVersion`, `fixedVersion`, `firstSeenAt`, `lastSeenAt` |
 
 `firstSeenAt` and `lastSeenAt` on `ImageVulnerability` drive the staleness filter — see [CVE staleness](#cve-staleness).
 
