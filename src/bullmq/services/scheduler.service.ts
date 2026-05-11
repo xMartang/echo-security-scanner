@@ -21,7 +21,6 @@ import type { SchedulerTickJobData } from '@/bullmq/types/job-payload.js';
  */
 export async function setupScheduler(
   schedulerQueue: Queue,
-  inboundScanQueue: Queue,
   connection: Redis,
 ): Promise<Worker[]> {
   // Task 1: Trivy image scanner -- idempotent, safe to call on every restart.

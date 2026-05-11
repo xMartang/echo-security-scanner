@@ -101,25 +101,27 @@ SERVICE_NAME
 PORT          # default 3000
 ```
 
-**Scanner only** — extended in `src/scanner/config/env.ts`:
+**BullMQ only** — extended in `src/bullmq/config/env.ts`:
 ```
 REDIS_URL
-TRIVY_SERVER_URL      # e.g. http://trivy-server:8080
-SCAN_INTERVAL_MS      # default 900000 (15 min)
+TRIVY_SERVER_URL              # e.g. http://trivy-server:8080
+SCAN_INTERVAL_MS              # default 900000 (15 min)
+VULNERABILITY_RETENTION_DAYS  # default 30
 ```
 
 ## Infrastructure Commands
 - `docker compose up --build` — start the entire stack
+- `pnpm pull-images` — optional: pre-pull every scan target image into the host docker daemon (avoids Docker Hub rate limits)
 - `pnpm prisma:migrate` — run database migrations (`prisma migrate dev`)
 - `pnpm prisma:studio` — open Prisma Studio
 - `pnpm build` — compile TypeScript
 - `pnpm dev` — run API in dev mode (`tsx watch src/api/index.ts`)
-- `pnpm dev:worker` — run Scanner in dev mode (`tsx watch src/scanner/index.ts`)
+- `pnpm dev:worker` — run BullMQ worker in dev mode (`tsx watch src/bullmq/index.ts`)
 - `pnpm test` — run Jest
 - `pnpm lint` — run ESLint
 - `pnpm typecheck` — `tsc --noEmit`
 - `pnpm start` — run compiled API output
-- `pnpm start:worker` — run compiled Scanner output
+- `pnpm start:worker` — run compiled BullMQ worker output
 
 ## Naming Conventions (enforced in code review)
 - **No single-letter or cryptic variable names.** Exceptions: loop counters `i`, `j`, `k`.

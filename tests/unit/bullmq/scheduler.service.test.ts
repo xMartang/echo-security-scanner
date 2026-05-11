@@ -23,23 +23,19 @@ const { setupScheduler } = await import('@/bullmq/services/scheduler.service.js'
 
 
 describe('setupScheduler', () => {
-  let mockAddBulk: ReturnType<typeof jest.fn<() => Promise<unknown[]>>>;
   let mockUpsertJobScheduler: ReturnType<typeof jest.fn<() => Promise<unknown>>>;
-  let mockScanQueue: Queue;
   let mockSchedulerQueue: Queue;
   let mockConnection: Redis;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockAddBulk = jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]);
     mockUpsertJobScheduler = jest.fn<() => Promise<unknown>>().mockResolvedValue({});
-    mockScanQueue = { addBulk: mockAddBulk } as unknown as Queue;
     mockSchedulerQueue = { upsertJobScheduler: mockUpsertJobScheduler } as unknown as Queue;
     mockConnection = {} as Redis;
   });
 
   it('registers a repeatable job scheduler on the scheduler queue', async () => {
-    await setupScheduler(mockSchedulerQueue, mockScanQueue, mockConnection);
+    await setupScheduler(mockSchedulerQueue, mockConnection);
     expect(mockUpsertJobScheduler).toHaveBeenCalledTimes(1);
     const [name, intervalOpts] = (mockUpsertJobScheduler.mock.calls[0] as unknown) as [
       string,
@@ -50,7 +46,7 @@ describe('setupScheduler', () => {
   });
 
   it('creates a BullMQ Worker for the image-scheduler queue', async () => {
-    await setupScheduler(mockSchedulerQueue, mockScanQueue, mockConnection);
+    await setupScheduler(mockSchedulerQueue, mockConnection);
     expect(MockWorker).toHaveBeenCalledWith(
       'image-scheduler',
       expect.any(Function) as unknown,

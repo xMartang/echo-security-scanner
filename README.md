@@ -26,7 +26,7 @@ The system is split into two independently deployable services:
 - **BullMQ service** (`src/bullmq/`): general-purpose task runner. Currently runs two tasks:
   - **Trivy scanner** (`tasks/scanners/trivy/`): scans images on a configurable interval; each image is a separate sandboxed job. Writes results to PostgreSQL.
   - **Stale-vuln-cleanup job** (`tasks/stale-vuln-cleanup/`): runs weekly and hard-deletes `ImageVulnerability` rows older than 30 days (see [CVE staleness](#cve-staleness) below).
-- **Trivy server**: runs in server mode; the BullMQ worker calls `trivy image --server` (no Docker socket needed on the worker).
+- **Trivy server**: runs in server mode and holds the vuln database. The BullMQ worker runs the trivy client (`trivy image --server`); the client still needs to read the target image locally to extract its package list, so the host docker socket is mounted into the bullmq container too (see [Security trade-offs](#security-trade-offs)).
 - **PostgreSQL** + **Prisma**: stores images, CVEs, packages, and join tables. The database is the only contract between API and BullMQ.
 - **Redis**: BullMQ job queue and scheduler backend (BullMQ service only).
 
@@ -405,8 +405,23 @@ docker compose down -v
 |---|---|---|---|
 | `architecture.md` | `cveId @unique`, single `packageId` FK on Vulnerability | Normalized: `Cve(cveId @unique)` + `Package` + `ImageVulnerability(imageId, cveId, packageId)` | Same CVE can affect multiple packages -- original schema causes upsert collisions on real Trivy output |
 | `performance.md` | Worker Thread if `JSON.parse` > 100ms | `stream-json` streaming always | Streaming bounds memory and never blocks the event loop; Worker Thread overhead unjustified |
-| `docker.md` | Mount docker.sock on Worker and Trivy Server | Mount on `trivy-server` only | `trivy --server` sends the image reference to the server which pulls it; worker socket mount is unnecessary attack surface |
 | Compose service name | `worker` | Renamed `bullmq` | "worker" overloaded with BullMQ `Worker` class and Node.js Worker Threads |
+
+---
+
+## Security trade-offs
+
+### Docker socket mounted on the bullmq container
+
+`docker-compose.yml` mounts `/var/run/docker.sock` into the `bullmq` container with `group_add: ["0"]` so the non-root `nodeapp` user can talk to the host Docker daemon. This is required because the Trivy client (running inside `bullmq`) inspects each target image locally to extract its package list before sending the list to the trivy server.
+
+The trade-off: anything that can talk to the docker socket can effectively run as root on the host (start privileged containers, mount host paths, etc.). For a local dev / take-home setup this is acceptable; for production you would normally either:
+
+- pre-build images and ship them via a private registry that trivy server can fetch directly, removing the need for the client to inspect images, or
+- use a rootless docker context, or
+- isolate scanning in a dedicated VM / namespace.
+
+If you do not need local image caching, you can remove both the socket mount and `group_add: ["0"]` from the `bullmq` service; trivy will then pull every target image from Docker Hub on every scan tick and hit the unauthenticated rate limit (100 req / 6 h).
 
 ---
 

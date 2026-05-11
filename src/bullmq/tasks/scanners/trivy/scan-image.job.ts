@@ -55,12 +55,17 @@ export async function processScanJob(
   const repo = createImageRepository(db);
   const imageRef = `${imageName}:${imageTag}`;
 
-  // 1. Mark image SCANNING so operators see it in progress.
-  const image = await repo.upsertImage(imageName, imageTag);
-  await repo.markScanning(image.id);
-  logger.info({ image: imageRef }, 'scan started');
-
+  // Whole pipeline -- including upsertImage / markScanning -- is wrapped so any
+  // failure path lands in a single error handler and the processor never throws
+  // back to BullMQ (which would mark the job failed and retry, possibly leaving
+  // Image.status=SCANNING forever).
+  let image: { id: number } | undefined;
   try {
+    // 1. Mark image SCANNING so operators see it in progress.
+    image = await repo.upsertImage(imageName, imageTag);
+    await repo.markScanning(image.id);
+    logger.info({ image: imageRef }, 'scan started');
+
     // 2. Invoke Trivy via execa; stream output through json-stream pipeline.
     const { result, stderr } = await scan(imageName, imageTag);
     if (stderr) logger.warn({ image: imageRef, stderr }, 'Trivy has non-empty stderr output.');
@@ -84,7 +89,22 @@ export async function processScanJob(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error({ image: imageRef, err }, 'scan failed');
-    await repo.markFailed(image.id, errorMessage);
+
+    // Best-effort: mark the image FAILED so operators see it in /api/images.
+    // If markFailed itself throws (DB down), swallow it -- the next bullmq
+    // startup runs markStuckScanningAsFailed as the safety net.
+    // If `image` is undefined, the failure happened during upsertImage so there
+    // is no row to update.
+    if (image !== undefined) {
+      try {
+        await repo.markFailed(image.id, errorMessage);
+      } catch (markErr) {
+        logger.error(
+          { image: imageRef, err: markErr },
+          'markFailed itself failed; image stays SCANNING until next startup',
+        );
+      }
+    }
     return { cveCount: 0 };
   }
 }

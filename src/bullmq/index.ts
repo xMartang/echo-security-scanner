@@ -51,7 +51,7 @@ async function main() {
   logger.info({ queue: SCAN_QUEUE_NAME, concurrency: scanWorker.concurrency }, 'scan worker ready');
 
   logger.debug({ schedulerQueue: SCHEDULER_QUEUE_NAME, scanQueue: SCAN_QUEUE_NAME }, 'setting up scheduler and stale-vuln-cleanup worker');
-  const [tickWorker, staleVulnCleanupWorker] = await setupScheduler(schedulerQueue, scanQueue, connection);
+  const [tickWorker, staleVulnCleanupWorker] = await setupScheduler(schedulerQueue, connection);
   logger.info({ intervalMs: env.SCAN_INTERVAL_MS }, 'scheduler ready');
 
   async function shutdown(signal: string): Promise<void> {
