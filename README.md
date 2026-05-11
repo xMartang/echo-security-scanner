@@ -34,44 +34,41 @@ The system is split into two independently deployable services:
 
 ## Database schema
 
-```mermaid
-erDiagram
-    Image {
-        int id PK
-        string name
-        string tag
-        ScanStatus status
-        datetime lastScannedAt
-        string lastError
-    }
-    Package {
-        int id PK
-        string name
-    }
-    Cve {
-        int id PK
-        string cveId
-        Severity severity
-        string description
-    }
-    ImagePackage {
-        int imageId FK
-        int packageId FK
-    }
-    ImageVulnerability {
-        int imageId FK
-        int cveId FK
-        int packageId FK
-        string installedVersion
-        string fixedVersion
-    }
+Three entities (`Image`, `Package`, `Cve`) connected by two join tables (`ImagePackage`, `ImageVulnerability`).
 
-    Image ||--o{ ImagePackage : "contains"
-    Package ||--o{ ImagePackage : "found in"
-    Image ||--o{ ImageVulnerability : "has"
-    Cve ||--o{ ImageVulnerability : "affects"
-    Package ||--o{ ImageVulnerability : "via"
+### Relationships
+
 ```
+       Image                                Package
+         |                                     |
+         |  ImagePackage    (imageId, packageId)
+         +-------------------------------------+
+         |
+         |  ImageVulnerability                  ┌────── Cve
+         +─── (imageId, cveId, packageId, ──────┤
+              installedVersion, fixedVersion,   └────── Package
+              firstSeenAt, lastSeenAt)
+```
+
+- `ImagePackage` links every image to the packages it ships.
+- `ImageVulnerability` links every image to the CVEs that affect it, naming the offending package and recording the installed and fixed versions plus first/last detection timestamps.
+
+### Entities
+
+| Table   | Columns |
+|---------|---------|
+| `Image`   | `id`, `name`, `tag`, `status` (`ScanStatus`), `lastScannedAt`, `lastError`, `createdAt`, `updatedAt` |
+| `Package` | `id`, `name` |
+| `Cve`     | `id`, `cveId`, `severity` (`Severity`), `description` |
+
+### Join tables
+
+| Table                  | Composite PK                  | Extra columns |
+|------------------------|-------------------------------|---------------|
+| `ImagePackage`         | `(imageId, packageId)`         | — |
+| `ImageVulnerability`   | `(imageId, cveId, packageId)`  | `installedVersion`, `fixedVersion`, `firstSeenAt`, `lastSeenAt` |
+
+`firstSeenAt` and `lastSeenAt` on `ImageVulnerability` drive the staleness filter — see [CVE staleness](#cve-staleness).
 
 ---
 
@@ -167,14 +164,20 @@ curl -s http://localhost:3000/health | jq
 {
   "data": {
     "db": "ok",
-    "scanner": "ok",
+    "scanner": {
+      "status": "ok",
+      "lastScannedAt": "2026-05-11T02:52:23.700Z",
+      "staleThresholdMs": 300000
+    },
     "status": "ok"
   }
 }
 ```
 
 - `db`: result of a lightweight DB ping.
-- `scanner`: `"ok"` if at least one image has been scanned recently, `"stale"` if no scans have completed within the expected interval.
+- `scanner.status`: `"ok"` if at least one image has been scanned within `staleThresholdMs`, `"stale"` otherwise.
+- `scanner.lastScannedAt`: timestamp of the most recent successful scan across all images.
+- `status`: overall status (`"ok"` only if both `db` and `scanner.status` are `"ok"`).
 
 Returns **200** if healthy, **503** if degraded.
 
@@ -190,21 +193,26 @@ curl -s http://localhost:3000/api/images | jq '.data[0]'
 
 ```json
 {
-  "id": 1,
+  "id": 3,
   "name": "nginx",
   "tag": "1.19",
   "status": "SUCCESS",
-  "lastScannedAt": "2026-05-10T00:00:00.000Z",
+  "lastScannedAt": "2026-05-11T02:55:22.970Z",
+  "lastError": null,
+  "createdAt": "2026-05-11T00:01:22.450Z",
+  "updatedAt": "2026-05-11T02:55:24.858Z",
   "cveCountBySeverity": {
-    "CRITICAL": 5,
-    "HIGH": 12,
-    "MEDIUM": 8,
-    "LOW": 3,
-    "UNKNOWN": 0,
-    "total": 28
+    "CRITICAL": 42,
+    "HIGH": 149,
+    "MEDIUM": 193,
+    "LOW": 31,
+    "UNKNOWN": 9,
+    "total": 424
   }
 }
 ```
+
+CVE counts reflect only **currently active** vulnerabilities (see [CVE staleness](#cve-staleness)).
 
 ---
 
@@ -220,7 +228,23 @@ curl -s "http://localhost:3000/api/images/nginx/1.19/cves" | jq '.data | length'
 curl -s "http://localhost:3000/api/images/nginx/1.19/cves?severity=CRITICAL" | jq '.data[0]'
 ```
 
-Valid `severity` values: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
+```json
+{
+  "cveId": "CVE-2018-25009",
+  "severity": "CRITICAL",
+  "description": "libwebp: out-of-bounds read in WebPMuxCreateInternal",
+  "packageName": "libwebp6",
+  "installedVersion": "0.6.1-2",
+  "fixedVersion": "0.6.1-2+deb10u1",
+  "firstSeenAt": "2026-05-11T00:03:07.637Z",
+  "lastSeenAt": "2026-05-11T02:55:22.970Z"
+}
+```
+
+- `firstSeenAt`: first scan that detected this CVE on this image.
+- `lastSeenAt`: most recent scan that confirmed it. Patched CVEs are filtered out via `lastSeenAt >= image.lastScannedAt`.
+
+Valid `severity` values: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`.
 
 Returns **404** if the image has never been scanned. Returns **400** for invalid severity.
 
@@ -228,21 +252,50 @@ Returns **404** if the image has never been scanned. Returns **400** for invalid
 
 ### `GET /api/cves`
 
-All unique CVEs found across all images. Optional `?severity=` filter.
+All unique CVEs that are currently active on at least one image. Optional `?severity=` filter.
 
 ```bash
-curl -s "http://localhost:3000/api/cves?severity=CRITICAL" | jq '.data | length'
+curl -s "http://localhost:3000/api/cves?severity=CRITICAL" | jq '.data[0]'
+```
+
+```json
+{
+  "id": 927,
+  "cveId": "CVE-2018-25009",
+  "severity": "CRITICAL",
+  "description": "libwebp: out-of-bounds read in WebPMuxCreateInternal"
+}
 ```
 
 ---
 
 ### `GET /api/cves/:cveId/images`
 
-All images affected by a specific CVE, including installed/fixed version details.
+All images currently affected by a specific CVE, with the installed and fixed version per image.
 
 ```bash
-curl -s "http://localhost:3000/api/cves/CVE-2026-7168/images" | jq '.data'
+curl -s "http://localhost:3000/api/cves/CVE-2018-25009/images" | jq '.data[0]'
 ```
+
+```json
+{
+  "image": {
+    "id": 3,
+    "name": "nginx",
+    "tag": "1.19",
+    "status": "SUCCESS",
+    "lastScannedAt": "2026-05-11T02:55:22.970Z",
+    "lastError": null,
+    "createdAt": "2026-05-11T00:01:22.450Z",
+    "updatedAt": "2026-05-11T02:55:24.858Z"
+  },
+  "packageName": "libwebp6",
+  "installedVersion": "0.6.1-2",
+  "fixedVersion": "0.6.1-2+deb10u1"
+}
+```
+
+Returns an empty array if the CVE exists in the database but no image currently has it active (e.g. it was patched in every image since the last scan).
 
 ---
 
