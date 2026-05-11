@@ -139,8 +139,10 @@ services:
     volumes:
       # Trivy client/server: the SERVER holds the vuln DB; the CLIENT (bullmq's
       # trivy binary) still inspects the image locally to extract package lists.
-      # Mounting the socket lets trivy use the host daemon instead of Docker Hub.
-      # Run `pnpm pull-images` once before starting the stack to pre-populate.
+      # Mounting the socket lets trivy use the host daemon when an image is cached
+      # locally, otherwise trivy pulls from Docker Hub directly. Optional helper:
+      # `pnpm pull-images` pre-pulls every target image so heavy scan ticks
+      # cannot exhaust the unauthenticated Docker Hub rate limit.
       - /var/run/docker.sock:/var/run/docker.sock
       - ./logs/bullmq:/var/log/app
     depends_on:

@@ -1,8 +1,12 @@
 /**
- * Pre-pulls every scan target image into the local Docker daemon so Trivy's
- * client can find them without hitting Docker Hub on each scan tick.
+ * Optional: pre-pulls every scan target image into the local Docker daemon so
+ * Trivy's client can find them without hitting Docker Hub on each scan tick.
  *
- * Run once before `docker compose up` (or any time the image list changes):
+ * The stack works without running this -- trivy will pull from Docker Hub on
+ * demand -- but doing so risks Docker Hub's unauthenticated rate limit
+ * (100 req / 6 h per IP) once the scheduler has run a few cycles.
+ *
+ * Run before `docker compose up`, or any time the image list changes:
  *   pnpm pull-images
  *
  * Images already present are skipped (no Docker Hub traffic).

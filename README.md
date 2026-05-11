@@ -97,19 +97,7 @@ cd echo-security-scanner
 cp .env.example .env
 ```
 
-### 2. Pre-pull scan target images
-
-Trivy's client/server split means the **client** (bullmq) downloads each image locally and extracts its package list, then sends only the package list to the server for CVE lookup. Without local copies, trivy falls back to pulling from Docker Hub on every scan tick, which quickly exhausts the unauthenticated rate limit (100 req / 6 h).
-
-Run this once before starting the stack (or after adding new images to `src/bullmq/tasks/scanners/images.ts`):
-
-```bash
-pnpm pull-images
-```
-
-Images already present in the local daemon are skipped, so re-running is safe and fast.
-
-### 3. Start the full stack
+### 2. Start the full stack
 
 ```bash
 docker compose up --build -d
@@ -119,7 +107,7 @@ docker compose up --build -d
 > The `bullmq` service waits until Trivy is ready (`start_period: 5m`).
 > Subsequent starts reuse the `trivy_cache` volume and are fast (~seconds).
 
-### 4. Verify all five services are healthy
+### 3. Verify all five services are healthy
 
 ```bash
 docker compose ps
@@ -136,7 +124,7 @@ redis      Up ... (healthy)
 trivy      Up ... (healthy)
 ```
 
-### 5. Wait for the first scan batch
+### 4. Wait for the first scan batch
 
 The BullMQ service enqueues all 10 images on startup via the scheduler tick. Each scan takes 10-60 s depending on Trivy's cache state.
 
@@ -144,6 +132,22 @@ The BullMQ service enqueues all 10 images on startup via the scheduler tick. Eac
 # Poll until at least one image shows SUCCESS
 watch -n 5 'curl -s http://localhost:3000/api/images | jq "[.data[] | {name,tag,status}]"'
 ```
+
+---
+
+## Optional: pre-pull scan target images
+
+Trivy's client/server split means the **client** (bullmq) downloads each image locally and extracts its package list, then sends only the package list to the server for CVE lookup. If the image is not already in the host Docker daemon, trivy falls back to pulling it from Docker Hub.
+
+This is fine for a one-off run, but if the scheduler ticks many times before the images are cached you can hit Docker Hub's unauthenticated rate limit (100 req / 6 h per IP), after which scans fail with `TOOMANYREQUESTS` until the window resets.
+
+You can avoid this by pre-pulling every target image into the host daemon once:
+
+```bash
+pnpm pull-images
+```
+
+Run this any time you change `src/bullmq/tasks/scanners/images.ts`. Images already present are skipped, so re-running is safe and cheap.
 
 ---
 
