@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 
 # IDE directories
 .vscode/
+
+# Claude Code local settings (machine-specific permissions/allowlists)
+.claude/settings.local.json
