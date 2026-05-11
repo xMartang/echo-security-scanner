@@ -368,6 +368,14 @@ pnpm test
 
 Tests run sequentially (`--runInBand`) to avoid resource contention between multiple testcontainers instances.
 
+### CI on pull requests
+
+The same suite (`pnpm lint && pnpm typecheck && pnpm test`) runs in GitHub Actions on PRs, but **only when the PR carries the `RUN_CI` label**. This keeps CI minutes off draft / WIP PRs.
+
+To trigger the workflow, add the `RUN_CI` label to your PR — the run kicks off immediately. Subsequent pushes to the same PR re-run the workflow automatically as long as the label is still attached.
+
+Branch protection on `main` requires the `ci / test` check to pass, so a PR with no `RUN_CI` label (or a failing check) cannot be merged.
+
 ---
 
 ## Development

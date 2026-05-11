@@ -1,0 +1,78 @@
+name: ci
+
+# Triggered only when the `RUN_CI` label is present on a PR.
+#
+# The workflow listens to `labeled`, `synchronize` and `reopened` events so:
+#   - adding `RUN_CI` to a PR runs the checks
+#   - new commits pushed to a PR that already has `RUN_CI` re-run the checks
+#   - reopening such a PR re-runs the checks
+# Anything else is filtered out by the `if` guard on the job.
+#
+# Branch protection on `main` should require the `ci / test` check to pass
+# before merge -- so a PR without `RUN_CI` (or with a failing check) cannot
+# be merged.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+
+jobs:
+  test:
+    name: test
+    if: |
+      (github.event.action == 'labeled' && github.event.label.name == 'RUN_CI') ||
+      ((github.event.action == 'synchronize' || github.event.action == 'reopened')
+        && contains(github.event.pull_request.labels.*.name, 'RUN_CI'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        env:
+          # parseEnv() at module load needs these defaults so suites that import
+          # service modules can initialize. Match tests/jest.env-setup.ts.
+          SERVICE_NAME: ci
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          REDIS_URL: redis://localhost:6379
+          TRIVY_SERVER_URL: http://localhost:8080
+          LOG_LEVEL: fatal
+        run: pnpm test
